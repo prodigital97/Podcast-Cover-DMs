@@ -1,0 +1,27 @@
+{
+  "note": "Soft no. Rule 6 — no counter-argument, no re-pitch. The only permitted move is the zero-obligation send in the third draft.",
+  "lead": {
+    "handle": "@twobrothershotsauce",
+    "podcast_name": "Two Brothers Hot Sauce",
+    "bio": "Small batch, ferment-first. Made in Leeds. Stocked in 40 delis and counting.",
+    "about": "Two-person sauce brand doing scotch bonnet and fermented chilli ranges, mostly deli and farm-shop retail plus a market stall.",
+    "audience_size": "11k",
+    "voice_notes": "casual, lowercase-ish, occasional emoji, quick replies",
+    "status": "soft_no",
+    "needs": "mentioned the labels look inconsistent across the range",
+    "offered": "offered to mock up two label concepts from their existing range",
+    "price": "not discussed",
+    "commitments": "none",
+    "full_thread": "pronoy: the ferment-first thing is the whole story and the labels don't say it — the scotch bonnet and the smoked one look like they're from different brands.\nthem: yeah we know 😅 it's been on the list for about a year\npronoy: happy to mock two up from what you've already got, just so you can see the range sitting together.",
+    "incoming_message": "honestly we've just signed with a designer for the rebrand. might come back to you for the video side down the line though"
+  },
+  "output": {
+    "read": "A polite close on the label work with a soft maybe attached — the design door is shut and should be treated as shut.",
+    "stage": "soft_no",
+    "drafts": [
+      {"tone": "warm", "text": "good — a ferment-first range deserves labels that actually say so. enjoy the rebrand, that's a fun stage. you know where I am if the video side ever comes round."},
+      {"tone": "direct", "text": "fair enough, glad it's finally moving after a year on the list. I'll leave you to it — door's open on the video side whenever."},
+      {"tone": "low_pressure", "text": "makes sense. if it's ever useful I can cut one clip from a video you've already got, just so there's something sitting on file — no obligation either way. otherwise good luck with the launch."}
+    ]
+  }
+}

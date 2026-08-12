@@ -1,0 +1,27 @@
+{
+  "note": "They asked what he'd actually do — door open. Rule 4 — free sample from their own episode, tied to the hiring goal they stated, not to views.",
+  "lead": {
+    "handle": "@mercer.mechanical",
+    "podcast_name": "On The Tools, In The Office",
+    "bio": "Commercial mechanical contractor, 40 vans. Running a trades business without the guesswork.",
+    "about": "Owner-operator talking margins, quoting, and hiring apprentices in commercial plumbing and HVAC.",
+    "audience_size": "6k",
+    "voice_notes": "full sentences, punctuates properly, no emoji, gets to the point",
+    "status": "green_light",
+    "needs": "wants more apprentice applications — says the last two intakes were thin",
+    "offered": "nothing yet",
+    "price": "not discussed",
+    "commitments": "none",
+    "full_thread": "pronoy: the episode on quoting change orders is the only one I've heard treat it as a hiring problem rather than a pricing one.\nthem: that's the whole issue. We can't take the work if we can't staff it.\npronoy: is the podcast doing anything for that, or is it mostly customers listening?",
+    "incoming_message": "We're posting the full episodes and nothing else. What would you actually do with them?"
+  },
+  "output": {
+    "read": "Green light — he asked directly what the work would be, with a staffing problem already on the table.",
+    "stage": "green_light",
+    "drafts": [
+      {"tone": "warm", "text": "Pull three clips out of each episode and build thumbnails that read on a phone, aimed at lads choosing between site work and college. Send me the apprentice intake episode and I'll cut one free, so you can judge it on applications rather than my word."},
+      {"tone": "direct", "text": "Clips and thumbnails, built around the staffing problem rather than the customer one. Pick an episode and I'll cut a sample free this week. You judge it on applications."},
+      {"tone": "low_pressure", "text": "Mostly clips and thumbnails. Easiest thing is I take one episode you've already posted and cut a sample free — no obligation, and you can see whether it moves apprentice applications at all."}
+    ]
+  }
+}

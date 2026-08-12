@@ -1,0 +1,27 @@
+{
+  "note": "First contact. Rule 2 — no pitch, close on a question about their process.",
+  "lead": {
+    "handle": "@coldcasecounty",
+    "podcast_name": "Cold Case County",
+    "bio": "unsolved cases from the Rust Belt. new ep every thursday. tips: dm",
+    "about": "Single-host narrative true crime, one unsolved regional case per season, heavy on court records and local newspaper archives.",
+    "audience_size": "18k",
+    "voice_notes": "all lowercase, short, dry, no emoji",
+    "status": "first_contact",
+    "needs": "nothing stated yet",
+    "offered": "nothing yet",
+    "price": "not discussed",
+    "commitments": "none",
+    "full_thread": "pronoy: the archive work on the Delphi-era episodes stood out — most shows in this space skip the court records entirely.",
+    "incoming_message": "appreciate that. took me four months in the county clerk's office lol"
+  },
+  "output": {
+    "read": "Warm but neutral — they took the compliment and offered a detail, which is an opening to keep talking, not a buying signal.",
+    "stage": "first_contact",
+    "drafts": [
+      {"tone": "warm", "text": "four months of clerk's office queues for one season is the part nobody hears about. does the paper trail ever change which case you end up covering, or do you lock the case first and chase whatever's there?"},
+      {"tone": "direct", "text": "four months in a records office is a different job to recording. do you pick the case first, or let the files decide?"},
+      {"tone": "low_pressure", "text": "that's the bit listeners never see. how far ahead of a season do you start pulling records?"}
+    ]
+  }
+}

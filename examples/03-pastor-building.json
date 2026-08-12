@@ -1,0 +1,27 @@
+{
+  "note": "Third exchange, still no opening. Rule 3 — keep building, measured register, close on a question.",
+  "lead": {
+    "handle": "@pastorjmarsh",
+    "podcast_name": "Grace Hill Teaching",
+    "bio": "Teaching pastor, Grace Hill. Sunday teaching, midweek Q&A, marriage series.",
+    "about": "Sermon podcast plus a midweek listener Q&A episode; congregation of around 800.",
+    "audience_size": "3.2k",
+    "voice_notes": "measured, full sentences, warm, no slang, no emoji",
+    "status": "building",
+    "needs": "wants the Q&A episodes to reach people outside the congregation",
+    "offered": "nothing yet",
+    "price": "not discussed",
+    "commitments": "none",
+    "full_thread": "pronoy: the midweek Q&A is doing something the Sunday teaching isn't — it lets people in without asking them to agree first.\nthem: That's kind of you to notice. We only started it because the questions were piling up after service.\npronoy: has it changed who's listening?",
+    "incoming_message": "The Q&A ones travel further than the Sunday teaching, which surprised me. People send them to friends who would never come on a Sunday."
+  },
+  "output": {
+    "read": "Genuinely engaged and reflective, but nothing has been asked of Pronoy — this is conversation, not an opening.",
+    "stage": "building",
+    "drafts": [
+      {"tone": "warm", "text": "That makes sense — a question is easier to forward than a sermon, because it doesn't ask the friend to commit to anything first. Are the questions still coming from your own congregation, or have you started getting them from people who only know you through the podcast?"},
+      {"tone": "direct", "text": "A question travels because it doesn't ask anything of the person receiving it. Do you choose which ones to answer, or work through them as they come in?"},
+      {"tone": "low_pressure", "text": "Interesting that it's the Q&A rather than the teaching. Are the questions from the congregation, or from listeners you've never met?"}
+    ]
+  }
+}

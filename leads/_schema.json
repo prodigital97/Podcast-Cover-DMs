@@ -1,0 +1,15 @@
+{
+  "handle": "@ instagram handle, with the @",
+  "podcast_name": "show or business name",
+  "bio": "their IG bio, copied verbatim — do not paraphrase",
+  "about": "what the show or business actually is, in their own framing",
+  "audience_size": "follower count or 'unknown'",
+  "voice_notes": "how they type — lowercase, formal, emoji-heavy, one-liners, voice notes",
+  "status": "first_contact | building | green_light | soft_no | hard_no | active_client",
+  "needs": "what they have said they need, or 'nothing stated yet'",
+  "offered": "what Pronoy has already offered, or 'nothing yet'",
+  "price": "any number discussed, or 'not discussed'",
+  "commitments": "anything Pronoy promised and has not delivered, or 'none'",
+  "full_thread": "the whole DM thread, oldest first, prefixed 'them:' / 'pronoy:'",
+  "incoming_message": "their newest message only"
+}
