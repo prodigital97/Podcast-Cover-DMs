@@ -1,32 +1,89 @@
-# Podcast Cover — DM reply drafts
+# Podcast Cover — DM drafts
 
-The prompt Pronoy uses to draft Instagram DM replies for Podcast Cover, plus the
-lead format it reads and worked examples of what good output looks like in four
-different worlds.
+Instagram DMs arrive, Claude drafts three replies in Pronoy's voice, the drafts land in
+Telegram, and nothing reaches Instagram until a button is tapped.
+
+```
+Instagram DM ──webhook──▶ service ──▶ builds/updates the lead from the Graph API
+                                 └──▶ Claude drafts 3 replies
+                                        │
+                          Telegram card ▼   [Send 1][Send 2][Send 3]
+                                            [Edit][Redraft][Skip]
+                                        │
+Instagram reply ◀──── approved text ────┘
+```
+
+The lead profile — handle, follower count, bio, how they type, pipeline stage, what
+they need — is built and maintained automatically from the API and from the
+conversation. There are no profiles to fill in by hand.
 
 ## Files
 
 | Path | What it is |
 | --- | --- |
-| `prompts/dm-reply.md` | The system prompt. Everything downstream fills its placeholders. |
-| `leads/_schema.json` | Every field the prompt expects, with a note on what belongs in it. |
-| `leads/example-lead.json` | A filled lead, ready to render. |
-| `scripts/render_prompt.py` | Fills the prompt from a lead file and prints it. |
-| `scripts/check_examples.py` | Checks the examples against the rules that can be checked in code. |
-| `examples/*.json` | Lead plus expected output, one per stage. |
+| `prompts/dm-reply.md` | The system prompt. The strategy rules live here. |
+| `app/main.py` | FastAPI service — the Instagram and Telegram webhooks. |
+| `app/approvals.py` | The flow: inbound DM → drafts → card → approved reply. |
+| `app/drafting.py` | Calls Claude; infers how a lead writes from how they've written. |
+| `app/instagram.py` | Signature checks, profile lookup, sending, the 24h window. |
+| `app/telegram.py` | The approval card and its buttons. |
+| `app/db.py` | SQLite: leads, message history, pending approvals. |
+| `leads/`, `examples/`, `scripts/` | The offline side: lead format, worked examples, CLI. |
 
-## Using it
+## Running it
 
 ```sh
-python3 scripts/render_prompt.py leads/example-lead.json | pbcopy
+pip install -r requirements.txt
+cp .env.example .env        # then fill it in — every field is commented
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Paste into the model, paste the JSON it returns back into the thread of your
-choice. Missing fields render as `unknown` and warn on stderr — that is deliberate,
-because a blank is safer than an invented follower count the reply then references.
+Point Meta's webhook at `https://<host>/webhooks/instagram` (subscribe to `messages`
+on the Instagram object) and register the Telegram side:
 
-Before drafting, fill `full_thread` and `incoming_message` honestly. Most bad drafts
-come from a thread that was summarised rather than pasted.
+```sh
+python3 scripts/set_telegram_webhook.py https://<host>
+```
+
+It needs a public HTTPS host — Meta and Telegram both push to you. A small VPS or a
+Railway/Fly instance is enough; the process is not CPU-bound and the database is a
+single SQLite file.
+
+### What you'll need from Meta
+
+The posting token is not sufficient. Messaging needs `instagram_business_manage_messages`
+(Instagram Login) or `instagram_manage_messages` (Facebook Login for Business), which
+means adding the scope and re-authorising — and in the Instagram app itself,
+**Settings → Messages → Connected tools → Allow access to messages** has to be on, or
+webhooks never fire.
+
+Reading a sender's *bio* is a separate thing again: it comes from `business_discovery`,
+which needs a Facebook Login token with `instagram_basic` and only works for
+professional accounts. Set `IG_USER_ID` and `IG_DISCOVERY_TOKEN` if you have one.
+Without it, leads are built from the messaging profile alone and `bio` stays unknown —
+the drafter is told "unknown" rather than being left to invent something.
+
+## The 24-hour window
+
+Instagram allows a reply within 24 hours of the person's last message. Past that, a
+send fails with a clear error rather than silently dropping. The `HUMAN_AGENT` tag
+extends it to 7 days, but only once Meta approves the `human_agent` permission for
+your app — set `IG_USE_HUMAN_AGENT_TAG=1` after that, not before.
+
+This is why the service only ever *replies*. It has no outbound path, by design:
+automated cold DMs are what gets accounts actioned, and the account is the asset.
+
+## Approving
+
+Each card shows who they are, what they sent, the model's read of it, and three drafts.
+
+- **Send 1/2/3** — delivers that draft as-is.
+- **Edit** — reply to the bot with your own text; that goes instead.
+- **Redraft** — throws the three away and asks for a visibly different angle.
+- **Skip** — closes the card and sends nothing.
+
+A card can only resolve once. If a send fails, the card stays open and the failure is
+reported in the thread rather than being swallowed.
 
 ## The stages
 
@@ -40,31 +97,35 @@ come from a thread that was summarised rather than pasted.
 - **hard_no** — close and stop.
 - **active_client** — they are paying. Answer as their supplier, not as a lead chaser.
 
-`stage` in the output should match `status` in the lead unless the new message
-moved them, which is the whole point of reading it — the checker flags a mismatch
-so you notice you moved someone rather than doing it silently.
+The model returns the stage it reads from each new message, and the lead's status
+follows it. It also reports what changed in `needs` / `offered` / `price` /
+`commitments`, so the pipeline maintains itself.
 
 ## The rules that get broken most
-
-Two of them, consistently:
 
 **Length.** A one-line message gets one or two lines back. The pitch drafts are the
 ones that creep, because a pitch feels like it needs explaining. It does not — see
 `examples/02`, where the whole offer fits in thirty words.
 
 **Re-pitching a soft no.** "Might come back to you later" is a close, not an
-invitation to make the case again. `examples/04` is the shape: acknowledge, wish
-them well, leave the door open once and stop.
+invitation to make the case again. `examples/04` is the shape: acknowledge, wish them
+well, leave the door open once and stop.
 
-Everything else — their vocabulary rather than podcast-marketing vocabulary, no
-price first, no emoji unless they used one — tends to hold on its own.
+## Working offline
+
+Render a prompt from a lead file without running the service:
+
+```sh
+python3 scripts/render_prompt.py leads/example-lead.json
+```
 
 ## Checking changes
 
 ```sh
-python3 scripts/check_examples.py
+python3 -m pytest tests -q          # 37 tests, no credentials needed
+python3 scripts/check_examples.py   # the worked examples against the strategy rules
 ```
 
-It reads `leads/_schema.json`, so adding a field there makes every example fail
-until it is filled in. Tone, specificity and whether a reply actually sounds like
-Pronoy are not checkable — read the drafts.
+The tests stub Instagram and Telegram, so the whole approval flow — including the
+duplicate-webhook, failed-send, and redraft paths — runs offline. What they cannot
+check is whether a draft actually sounds like Pronoy; read those.
