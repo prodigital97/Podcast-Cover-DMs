@@ -24,7 +24,8 @@ conversation. There are no profiles to fill in by hand.
 | `prompts/dm-reply.md` | The system prompt. The strategy rules live here. |
 | `app/main.py` | FastAPI service — the Instagram and Telegram webhooks. |
 | `app/approvals.py` | The flow: inbound DM → drafts → card → approved reply. |
-| `app/drafting.py` | Calls Claude; infers how a lead writes from how they've written. |
+| `app/drafting.py` | Builds the prompt; infers how a lead writes from how they've written. |
+| `app/providers.py` | The model backend — Claude or Gemini, chosen by `LLM_PROVIDER`. |
 | `app/instagram.py` | Signature checks, profile lookup, sending, the 24h window. |
 | `app/telegram.py` | The approval card and its buttons. |
 | `app/db.py` | SQLite: leads, message history, pending approvals. |
@@ -62,6 +63,21 @@ which needs a Facebook Login token with `instagram_basic` and only works for
 professional accounts. Set `IG_USER_ID` and `IG_DISCOVERY_TOKEN` if you have one.
 Without it, leads are built from the messaging profile alone and `bio` stays unknown —
 the drafter is told "unknown" rather than being left to invent something.
+
+## Choosing the model
+
+`LLM_PROVIDER=anthropic` or `LLM_PROVIDER=gemini`. Both use native structured
+outputs, so the drafts come back schema-valid or the call fails — there is no
+JSON-repair path to go wrong. Only the selected provider's API key is needed.
+
+Set `GEMINI_MODEL` to the exact id you want. An unknown id fails at draft time
+with a 404 rather than at startup, so check it against Google's current model
+list before you rely on it.
+
+Whichever you pick, judge it on real threads rather than on the spec sheet.
+This is a voice-matching and judgement task — the failure mode of a weaker model
+here is not malformed output, it is drafts that are fluent and slightly generic,
+which is exactly the thing the strategy rules exist to prevent.
 
 ## The 24-hour window
 
@@ -122,7 +138,7 @@ python3 scripts/render_prompt.py leads/example-lead.json
 ## Checking changes
 
 ```sh
-python3 -m pytest tests -q          # 37 tests, no credentials needed
+python3 -m pytest tests -q          # 47 tests, no credentials needed
 python3 scripts/check_examples.py   # the worked examples against the strategy rules
 ```
 

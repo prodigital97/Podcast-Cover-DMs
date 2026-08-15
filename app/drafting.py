@@ -4,22 +4,11 @@ from __future__ import annotations
 import logging
 import re
 
-import anthropic
-
-from app.config import config
 from app.models import DraftSet
 from app.prompt import render
+from app.providers import provider
 
 log = logging.getLogger(__name__)
-
-_client: anthropic.AsyncAnthropic | None = None
-
-
-def client() -> anthropic.AsyncAnthropic:
-    global _client
-    if _client is None:
-        _client = anthropic.AsyncAnthropic()
-    return _client
 
 
 EMOJI = re.compile(
@@ -55,7 +44,7 @@ def infer_voice_notes(messages: list[str]) -> str:
 
 
 async def draft(lead: dict, incoming: str, thread: str, *, nudge: str = "") -> DraftSet:
-    """Ask the model for the three drafts. Raises on refusal or a failed parse."""
+    """Ask the configured model for the three drafts. Raises on refusal or bad output."""
     lead_view = {
         "handle": lead.get("handle"),
         "podcast_name": lead.get("podcast_name"),
@@ -77,18 +66,7 @@ async def draft(lead: dict, incoming: str, thread: str, *, nudge: str = "") -> D
     if nudge:
         prompt += f"\n\n## THIS ROUND\n{nudge}\n"
 
-    response = await client().messages.parse(
-        model=config.MODEL,
-        max_tokens=8000,
-        output_config={"effort": config.EFFORT},
-        messages=[{"role": "user", "content": prompt}],
-        output_format=DraftSet,
-    )
-    if response.stop_reason == "refusal":
-        raise RuntimeError(f"model declined to draft: {response.stop_details}")
-    if response.parsed_output is None:
-        raise RuntimeError(f"drafting returned no parseable output (stop: {response.stop_reason})")
-    return response.parsed_output
+    return await provider().complete(prompt)
 
 
 REDRAFT_NUDGE = (

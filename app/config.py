@@ -36,8 +36,13 @@ class Config:
     TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
     # --- Model -------------------------------------------------------------
-    MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-opus-5")
-    EFFORT = os.environ.get("ANTHROPIC_EFFORT", "medium")
+    # "anthropic" or "gemini". Both use native structured outputs.
+    LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "anthropic").strip().lower()
+    ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-opus-5")
+    ANTHROPIC_EFFORT = os.environ.get("ANTHROPIC_EFFORT", "medium")
+    # Set this to whichever Flash model you actually want — an unknown id is a
+    # 404 at draft time, not at startup.
+    GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
     # --- Storage -----------------------------------------------------------
     DB_PATH = os.environ.get("DB_PATH", "podcast_cover_dms.sqlite3")
@@ -57,6 +62,15 @@ class Config:
     @staticmethod
     def telegram_token() -> str:
         return _req("TELEGRAM_BOT_TOKEN")
+
+    @staticmethod
+    def gemini_key() -> str:
+        return _req("GEMINI_API_KEY")
+
+    # An instance method, not a classmethod: every setting is read through the
+    # `config` instance, and a classmethod would silently ignore overrides on it.
+    def model_id(self) -> str:
+        return self.GEMINI_MODEL if self.LLM_PROVIDER == "gemini" else self.ANTHROPIC_MODEL
 
     @staticmethod
     def telegram_secret() -> str:
