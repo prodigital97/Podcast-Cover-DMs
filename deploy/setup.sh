@@ -52,6 +52,11 @@ echo "==> Creating service user"
 id -u "$APP_USER" >/dev/null 2>&1 || useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin "$APP_USER"
 
 echo "==> Fetching the code"
+# After the first run this directory is owned by $APP_USER, not root. Without
+# this, git refuses every subsequent `git fetch`/`git pull` run as root here —
+# including this script's own re-run path — with "detected dubious ownership".
+git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$APP_DIR" \
+    || git config --global --add safe.directory "$APP_DIR"
 if [[ -d "$APP_DIR/.git" ]]; then
     git -C "$APP_DIR" fetch --quiet origin "$BRANCH"
     git -C "$APP_DIR" reset --hard --quiet "origin/$BRANCH"
