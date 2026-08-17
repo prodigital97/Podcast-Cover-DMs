@@ -1,82 +1,34 @@
 #!/usr/bin/env python3
 """Finish Telegram setup: verify the bot token, find your chat id, generate the
-webhook secret. Reads TELEGRAM_BOT_TOKEN from the env file and never prints it.
+webhook secret. Reads from the env file (see scripts/_envfile.py) and never
+prints the token.
 
     python3 scripts/telegram_setup.py               # auto-detect the env file
     python3 scripts/telegram_setup.py /path/to/env   # or point at one explicitly
+
+Writes the chat id and webhook secret back into that file, so it needs to run
+as root on the server (the file is root:dmbot 640 — the service can read its
+own credentials but not write them).
 
 Run this, then message your bot anything (e.g. "hi") in Telegram, then run it
 again — that second run is how it finds your chat id.
 """
 import pathlib
-import re
 import secrets
 import sys
 
 import httpx
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-
-# Local dev keeps credentials in .env at the project root. deploy/setup.sh keeps
-# them in /etc instead, deliberately outside the git-managed directory, so a
-# redeploy (which replaces ROOT wholesale) can never touch them. Check both.
-CANDIDATE_ENV_PATHS = [ROOT / ".env", pathlib.Path("/etc/podcast-cover-dms/env")]
-
-
-def resolve_env_path() -> pathlib.Path:
-    if len(sys.argv) > 1:
-        path = pathlib.Path(sys.argv[1])
-        if not path.exists():
-            print(f"no such file: {path}", file=sys.stderr)
-            raise SystemExit(2)
-        return path
-    for path in CANDIDATE_ENV_PATHS:
-        if path.exists():
-            return path
-    tried = ", ".join(str(p) for p in CANDIDATE_ENV_PATHS)
-    print(f"no env file found — tried: {tried}", file=sys.stderr)
-    print("copy .env.example to .env (local) or check the deploy setup (server)", file=sys.stderr)
-    raise SystemExit(2)
-
-
-ENV_PATH = resolve_env_path()
-
-
-def read_env() -> dict[str, str]:
-    values = {}
-    for line in ENV_PATH.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        values[key.strip()] = value.strip()
-    return values
-
-
-def write_env_value(key: str, value: str) -> None:
-    text = ENV_PATH.read_text()
-    pattern = re.compile(rf"^{re.escape(key)}=.*$", re.MULTILINE)
-    if pattern.search(text):
-        text = pattern.sub(f"{key}={value}", text)
-    else:
-        text += f"\n{key}={value}\n"
-    try:
-        ENV_PATH.write_text(text)
-    except PermissionError:
-        # deploy/setup.sh locks /etc/podcast-cover-dms/env to root:dmbot 640 —
-        # the running service can read it but not write it, on purpose. This
-        # script needs to write it, so it needs to run as root, not as dmbot.
-        print(f"\ncannot write to {ENV_PATH} — permission denied.", file=sys.stderr)
-        print("Run this script as root instead (drop `-u dmbot`):", file=sys.stderr)
-        print(f"    sudo {sys.executable} {' '.join(sys.argv)}", file=sys.stderr)
-        raise SystemExit(1) from None
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import _envfile  # noqa: E402
 
 
 def main() -> int:
-    env = read_env()
+    env_path = _envfile.resolve_path(sys.argv)
+    env = _envfile.read(env_path)
     token = env.get("TELEGRAM_BOT_TOKEN", "")
     if not token:
-        print(f"TELEGRAM_BOT_TOKEN is empty in {ENV_PATH} — fill it in there first", file=sys.stderr)
+        print(f"TELEGRAM_BOT_TOKEN is empty in {env_path} — fill it in there first", file=sys.stderr)
         return 2
 
     api = f"https://api.telegram.org/bot{token}"
@@ -111,16 +63,16 @@ def main() -> int:
             print(f"  {chat_id}  ({who})")
     else:
         (chat_id, who), = chat_ids.items()
-        write_env_value("TELEGRAM_CHAT_ID", str(chat_id))
-        print(f"✓ found your chat id ({who}) and saved it to {ENV_PATH}")
+        _envfile.write_value(env_path, "TELEGRAM_CHAT_ID", str(chat_id))
+        print(f"✓ found your chat id ({who}) and saved it to {env_path}")
 
     if not env.get("TELEGRAM_WEBHOOK_SECRET", "").strip():
-        write_env_value("TELEGRAM_WEBHOOK_SECRET", secrets.token_hex(16))
-        print(f"✓ generated TELEGRAM_WEBHOOK_SECRET and saved it to {ENV_PATH}")
+        _envfile.write_value(env_path, "TELEGRAM_WEBHOOK_SECRET", secrets.token_hex(16))
+        print(f"✓ generated TELEGRAM_WEBHOOK_SECRET and saved it to {env_path}")
     else:
         print("✓ TELEGRAM_WEBHOOK_SECRET already set")
 
-    env = read_env()
+    env = _envfile.read(env_path)
     missing = [k for k in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "TELEGRAM_WEBHOOK_SECRET") if not env.get(k)]
     if missing:
         print(f"\nStill missing: {', '.join(missing)}")
