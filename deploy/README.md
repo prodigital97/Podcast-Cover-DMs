@@ -53,10 +53,22 @@ You should get `{"status":"ok"}`.
 
 ## 4. Register the webhooks
 
-**Telegram** — from the server:
+**Telegram** — from the server. First, find your chat ID and generate the
+webhook secret (this writes into `/etc/podcast-cover-dms/env`, so it needs
+root — not `-u dmbot`, which can only read that file):
 
 ```sh
 cd /opt/podcast-cover-dms
+sudo .venv/bin/python scripts/telegram_setup.py
+```
+
+It'll tell you to message the bot in Telegram if it hasn't seen you yet — do
+that, then run the same command again. Once it reports everything is set,
+restart the service so it picks up the new values, then register the webhook
+(this one only reads, so `-u dmbot` is fine):
+
+```sh
+sudo systemctl restart podcast-cover-dms
 sudo -u dmbot .venv/bin/python scripts/set_telegram_webhook.py https://<your-hostname>
 ```
 

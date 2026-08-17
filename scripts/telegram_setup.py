@@ -60,7 +60,16 @@ def write_env_value(key: str, value: str) -> None:
         text = pattern.sub(f"{key}={value}", text)
     else:
         text += f"\n{key}={value}\n"
-    ENV_PATH.write_text(text)
+    try:
+        ENV_PATH.write_text(text)
+    except PermissionError:
+        # deploy/setup.sh locks /etc/podcast-cover-dms/env to root:dmbot 640 —
+        # the running service can read it but not write it, on purpose. This
+        # script needs to write it, so it needs to run as root, not as dmbot.
+        print(f"\ncannot write to {ENV_PATH} — permission denied.", file=sys.stderr)
+        print("Run this script as root instead (drop `-u dmbot`):", file=sys.stderr)
+        print(f"    sudo {sys.executable} {' '.join(sys.argv)}", file=sys.stderr)
+        raise SystemExit(1) from None
 
 
 def main() -> int:
