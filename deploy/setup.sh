@@ -33,8 +33,8 @@ fi
 echo "==> Installing packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq python3 python3-venv python3-pip git curl debian-keyring \
-    debian-archive-keyring apt-transport-https sqlite3
+apt-get install -y -qq python3 python3-venv python3-pip git curl gnupg nano \
+    ca-certificates debian-keyring debian-archive-keyring apt-transport-https sqlite3
 
 if ! command -v caddy >/dev/null; then
     echo "==> Installing Caddy (handles HTTPS certificates automatically)"
