@@ -16,6 +16,15 @@ from app.instagram import InstagramClient, parse_events, verify_challenge, verif
 from app.telegram import TelegramClient, parse_callback
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+# httpx logs every outgoing request at INFO, full URL included. Telegram's Bot
+# API puts the bot token directly in the URL path, and our own Instagram
+# client passes its access token as a URL query parameter — either would land
+# the credential in plaintext in the server log at the default INFO level.
+# Only this app's own "podcast-cover-dms" logger needs INFO; httpx's request
+# tracing is a debugging aid, not something to run at INFO in production.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 log = logging.getLogger("podcast-cover-dms")
 
 instagram = InstagramClient()

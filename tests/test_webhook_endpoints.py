@@ -105,3 +105,12 @@ def test_approvals_from_another_chat_are_ignored():
     assert main._authorised("4242")
     assert main._authorised(4242)
     assert not main._authorised("9999")
+
+
+def test_httpx_request_logging_is_silenced_so_credentials_never_reach_the_log():
+    # httpx logs the full URL of every request at INFO — Telegram's bot token
+    # lives in that URL path, and our own Instagram client's access token is a
+    # URL query param. Regression test for the token-leak fix in app/main.py.
+    import logging
+
+    assert logging.getLogger("httpx").level >= logging.WARNING
