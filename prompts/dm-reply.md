@@ -71,9 +71,12 @@ British-leaning spelling.
 Return ONLY valid JSON, no markdown fences, no preamble:
 
 {
-  "read": "one sentence on what they're actually signalling — interest, a polite
-           brush-off, a question, or a green light",
+  "read": "one sentence on what they're actually signalling — interest, a polite brush-off, a question, or a green light",
   "stage": "first_contact | building | green_light | soft_no | hard_no | active_client",
+  "conversion_probability": 0-100 (integer percentage of how likely this lead is to convert into a paying client, based on budget questions, explicit need, responsiveness, and buying signals),
+  "conversion_rationale": "short 1-sentence breakdown of why they scored this conversion probability",
+  "buying_signals": ["signal 1", "signal 2"],
+  "recommended_action": "recommended next strategic move for Pronoy",
   "drafts": [
     {"tone": "warm",         "text": "..."},
     {"tone": "direct",       "text": "..."},

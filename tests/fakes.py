@@ -53,6 +53,10 @@ def draft_set(stage="first_contact", **lead_update) -> DraftSet:
     return DraftSet(
         read="They asked a question.",
         stage=stage,
+        conversion_probability=75,
+        conversion_rationale="Active lead inquiry.",
+        buying_signals=["Asked pricing"],
+        recommended_action="Offer baseline rates and ask for show link.",
         drafts=[
             Draft(tone="warm", text="warm draft"),
             Draft(tone="direct", text="direct draft"),

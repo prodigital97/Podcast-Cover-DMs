@@ -99,6 +99,9 @@ def _recent_inbound(igsid: str, limit: int = 8) -> list[str]:
     return [row["text"] for row in rows]
 
 
+import json
+
+
 def _apply_lead_update(igsid: str, drafts) -> None:
     """Fold the model's pipeline reading back into the lead. Nulls mean unchanged."""
     update = drafts.lead_update
@@ -109,6 +112,10 @@ def _apply_lead_update(igsid: str, drafts) -> None:
         offered=update.offered,
         price=update.price,
         commitments=update.commitments,
+        conversion_probability=getattr(drafts, "conversion_probability", 50),
+        conversion_rationale=getattr(drafts, "conversion_rationale", ""),
+        buying_signals=json.dumps(getattr(drafts, "buying_signals", [])),
+        recommended_action=getattr(drafts, "recommended_action", ""),
     )
 
 

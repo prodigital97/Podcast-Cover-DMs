@@ -28,5 +28,9 @@ class LeadUpdate(BaseModel):
 class DraftSet(BaseModel):
     read: str
     stage: Stage
+    conversion_probability: int
+    conversion_rationale: str
+    buying_signals: list[str]
+    recommended_action: str
     drafts: list[Draft]
     lead_update: LeadUpdate

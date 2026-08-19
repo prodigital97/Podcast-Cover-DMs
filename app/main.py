@@ -4,14 +4,22 @@ Nothing is ever sent to Instagram without an explicit tap in Telegram.
 """
 from __future__ import annotations
 
+import csv
 import hmac
+import io
 import logging
+import pathlib
+import time
+from typing import Any
+import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import BackgroundTasks, FastAPI, Header, Request, Response
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request, Response
+from fastapi.responses import FileResponse
 
 from app import approvals, db
 from app.config import config
+from app.drafting import REDRAFT_NUDGE, draft, infer_voice_notes
 from app.instagram import InstagramClient, parse_events, verify_challenge, verify_signature
 from app.telegram import TelegramClient, parse_callback
 
@@ -184,3 +192,177 @@ async def _process_message(message: dict) -> None:
     except Exception as exc:
         log.exception("on-demand drafting failed in Telegram")
         await telegram.send(f"⚠️ Drafting failed: {exc}")
+
+
+# --- Dashboard & CRM REST API ----------------------------------------------
+
+from fastapi.staticfiles import StaticFiles
+
+STATIC_DIR = pathlib.Path(__file__).resolve().parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/")
+@app.get("/dashboard")
+async def dashboard() -> Response:
+    index_file = STATIC_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return Response("Dashboard UI loading... static files not yet initialized.", media_type="text/plain")
+
+
+@app.get("/api/leads")
+async def api_list_leads() -> dict[str, Any]:
+    leads = db.list_leads()
+    return {"leads": leads, "count": len(leads)}
+
+
+@app.post("/api/leads")
+async def api_create_lead(payload: dict[str, Any]) -> dict[str, Any]:
+    handle = (payload.get("handle") or "").strip()
+    igsid = payload.get("igsid") or (f"lead_{handle.lstrip('@')}" if handle else f"lead_{uuid.uuid4().hex[:8]}")
+    
+    lead_data = {
+        "handle": f"@{handle.lstrip('@')}" if handle else None,
+        "podcast_name": payload.get("podcast_name"),
+        "bio": payload.get("bio"),
+        "audience_size": str(payload["audience_size"]) if payload.get("audience_size") else None,
+        "notes": payload.get("notes", ""),
+        "status": payload.get("status", "first_contact"),
+    }
+    lead = db.upsert_lead(igsid, **lead_data)
+    
+    initial_message = (payload.get("initial_message") or "").strip()
+    drafts = None
+    if initial_message:
+        db.add_message(igsid, "them", initial_message)
+        drafts_obj = await draft(lead, initial_message, db.thread(igsid))
+        approvals._apply_lead_update(igsid, drafts_obj)
+        approval_id = db.create_approval(igsid, initial_message, drafts_obj.model_dump())
+        lead = db.get_lead(igsid)
+        drafts = drafts_obj.model_dump()
+        drafts["approval_id"] = approval_id
+
+    return {"success": True, "igsid": igsid, "lead": lead, "drafts": drafts}
+
+
+@app.get("/api/leads/{igsid}")
+async def api_get_lead(igsid: str) -> dict[str, Any]:
+    lead = db.get_lead(igsid)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    messages = db.get_lead_messages(igsid)
+    open_approval = db.open_approval_for(igsid)
+    return {"lead": lead, "messages": messages, "open_approval": open_approval}
+
+
+@app.put("/api/leads/{igsid}")
+async def api_update_lead(igsid: str, payload: dict[str, Any]) -> dict[str, Any]:
+    lead = db.get_lead(igsid)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    updated = db.upsert_lead(igsid, **payload)
+    return {"success": True, "lead": updated}
+
+
+@app.delete("/api/leads/{igsid}")
+async def api_delete_lead(igsid: str) -> dict[str, Any]:
+    deleted = db.delete_lead(igsid)
+    return {"success": deleted}
+
+
+@app.post("/api/leads/{igsid}/messages")
+async def api_add_message(igsid: str, payload: dict[str, Any]) -> dict[str, Any]:
+    text = (payload.get("text") or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+    direction = payload.get("direction", "them")
+    if direction not in {"them", "pronoy"}:
+        direction = "them"
+
+    lead = db.get_lead(igsid)
+    if not lead:
+        lead = db.upsert_lead(igsid, handle=igsid, status="first_contact")
+
+    db.add_message(igsid, direction, text)
+
+    drafts = None
+    if direction == "them":
+        lead = db.upsert_lead(igsid, voice_notes=infer_voice_notes(approvals._recent_inbound(igsid)))
+        drafts_obj = await draft(lead, text, db.thread(igsid))
+        approvals._apply_lead_update(igsid, drafts_obj)
+        approval_id = db.create_approval(igsid, text, drafts_obj.model_dump())
+        lead = db.get_lead(igsid)
+        drafts = drafts_obj.model_dump()
+        drafts["approval_id"] = approval_id
+    elif direction == "pronoy":
+        open_app = db.open_approval_for(igsid)
+        if open_app:
+            db.set_approval_state(open_app["id"], "sent", sent_text=text)
+
+    messages = db.get_lead_messages(igsid)
+    return {"success": True, "lead": lead, "messages": messages, "drafts": drafts}
+
+
+@app.post("/api/leads/{igsid}/redraft")
+async def api_redraft(igsid: str) -> dict[str, Any]:
+    lead = db.get_lead(igsid)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    open_app = db.open_approval_for(igsid)
+    incoming_text = open_app["incoming_text"] if open_app else "Inquiry about podcast cover design and branding"
+    
+    drafts_obj = await draft(lead, incoming_text, db.thread(igsid), nudge=REDRAFT_NUDGE)
+    approvals._apply_lead_update(igsid, drafts_obj)
+    
+    if open_app:
+        db.set_approval_state(open_app["id"], "superseded")
+    
+    new_approval_id = db.create_approval(igsid, incoming_text, drafts_obj.model_dump())
+    drafts = drafts_obj.model_dump()
+    drafts["approval_id"] = new_approval_id
+    return {"success": True, "drafts": drafts, "lead": db.get_lead(igsid)}
+
+
+@app.post("/api/leads/{igsid}/approve")
+async def api_approve_draft(igsid: str, payload: dict[str, Any]) -> dict[str, Any]:
+    text = (payload.get("text") or "").strip()
+    approval_id = payload.get("approval_id")
+    if not text:
+        raise HTTPException(status_code=400, detail="Draft text required")
+    
+    if approval_id:
+        db.set_approval_state(approval_id, "sent", sent_text=text)
+    
+    db.add_message(igsid, "pronoy", text)
+    messages = db.get_lead_messages(igsid)
+    lead = db.get_lead(igsid)
+    return {"success": True, "lead": lead, "messages": messages}
+
+
+@app.get("/api/export/csv")
+async def api_export_csv() -> Response:
+    rows = db.get_export_rows()
+    if not rows:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Instagram ID / Handle", "Podcast Name", "Bio / Niche", "Status / Stage", "Conversion Probability (%)", "Full Chat History"])
+        csv_content = output.getvalue()
+    else:
+        output = io.StringIO()
+        fieldnames = list(rows[0].keys())
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        for r in rows:
+            writer.writerow(r)
+        csv_content = output.getvalue()
+
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=podcast_cover_leads_{int(time.time())}.csv"
+        },
+    )
