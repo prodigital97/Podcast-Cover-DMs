@@ -1,5 +1,5 @@
 /**
- * Podcast Cover DM Copilot & CRM Dashboard Frontend
+ * Mobile-First Podcast Cover DM Copilot & CRM Dashboard
  */
 
 let state = {
@@ -8,6 +8,8 @@ let state = {
   activeFilter: 'all',
   searchQuery: '',
   composerDir: 'them',
+  mobileActivePane: 'messages', // 'messages' or 'drafts'
+  currentView: 'inbox', // 'inbox', 'chat', 'crm'
 };
 
 const TONE_LABELS = {
@@ -17,24 +19,26 @@ const TONE_LABELS = {
 };
 
 // --- DOM Elements ---
-const elements = {
+const el = {
+  app: document.getElementById('app'),
   leadsList: document.getElementById('leads-list'),
   searchLeads: document.getElementById('search-leads'),
-  filterTabs: document.querySelectorAll('.filter-tab'),
-  noLeadSelected: document.getElementById('no-lead-selected'),
-  leadActiveView: document.getElementById('lead-active-view'),
-  activeLeadAvatar: document.getElementById('active-lead-avatar'),
-  activeLeadHandle: document.getElementById('active-lead-handle'),
-  activeLeadStageBadge: document.getElementById('active-lead-stage-badge'),
-  activeLeadPodcast: document.getElementById('active-lead-podcast'),
-  activeLeadAudience: document.getElementById('active-lead-audience'),
-  btnEditLead: document.getElementById('btn-edit-lead'),
-  btnDeleteLead: document.getElementById('btn-delete-lead'),
-  conversionScore: document.getElementById('conversion-score'),
-  conversionTag: document.getElementById('conversion-tag'),
-  conversionBar: document.getElementById('conversion-bar'),
-  conversionRationale: document.getElementById('conversion-rationale'),
-  buyingSignalsList: document.getElementById('buying-signals-list'),
+  filterTabs: document.querySelectorAll('.pill-tab'),
+  btnBackToInbox: document.getElementById('btn-back-to-inbox'),
+  headerHandle: document.getElementById('header-handle'),
+  headerStageBadge: document.getElementById('header-stage-badge'),
+  btnEditLeadHeader: document.getElementById('btn-edit-lead-header'),
+  btnDeleteLeadHeader: document.getElementById('btn-delete-lead-header'),
+  bannerPodcast: document.getElementById('banner-podcast'),
+  bannerAudience: document.getElementById('banner-audience'),
+  bannerScore: document.getElementById('banner-score'),
+  conversionProgressBar: document.getElementById('conversion-progress-bar'),
+  bannerRationale: document.getElementById('banner-rationale'),
+  bannerSignals: document.getElementById('banner-signals'),
+  tabShowMessages: document.getElementById('tab-show-messages'),
+  tabShowDrafts: document.getElementById('tab-show-drafts'),
+  draftCountBadge: document.getElementById('draft-count-badge'),
+  chatDualContainer: document.querySelector('.chat-dual-container'),
   messagesContainer: document.getElementById('messages-container'),
   messageTextInput: document.getElementById('message-text-input'),
   btnSendMessage: document.getElementById('btn-send-message'),
@@ -43,6 +47,9 @@ const elements = {
   draftsContainer: document.getElementById('drafts-container'),
   draftsLoading: document.getElementById('drafts-loading'),
   btnRedraftCard: document.getElementById('btn-redraft-card'),
+  navBtnChats: document.getElementById('nav-btn-chats'),
+  navBtnCrm: document.getElementById('nav-btn-crm'),
+  crmTableBody: document.getElementById('crm-table-body'),
   leadModal: document.getElementById('lead-modal'),
   leadForm: document.getElementById('lead-form'),
   formIgsid: document.getElementById('form-igsid'),
@@ -54,13 +61,6 @@ const elements = {
   initialMsgGroup: document.getElementById('initial-msg-group'),
   formNotes: document.getElementById('form-notes'),
   modalTitle: document.getElementById('modal-title'),
-  crmModal: document.getElementById('crm-modal'),
-  crmTableBody: document.getElementById('crm-table-body'),
-  btnExportCsv: document.getElementById('btn-export-csv'),
-  btnViewCrm: document.getElementById('btn-view-crm'),
-  btnNewLead: document.getElementById('btn-new-lead'),
-  mobileMenuBtn: document.getElementById('mobile-menu-btn'),
-  sidebar: document.getElementById('sidebar'),
   toast: document.getElementById('toast'),
 };
 
@@ -68,42 +68,54 @@ const elements = {
 document.addEventListener('DOMContentLoaded', () => {
   initEventListeners();
   loadLeads();
+  setMobileChatPane('messages');
 });
 
 function initEventListeners() {
-  // Search and Filters
-  elements.searchLeads.addEventListener('input', (e) => {
+  // Mobile Back button
+  el.btnBackToInbox.addEventListener('click', () => {
+    switchView('inbox');
+  });
+
+  // Search & Filter Tabs
+  el.searchLeads.addEventListener('input', (e) => {
     state.searchQuery = e.target.value.toLowerCase();
     renderLeadsList();
   });
 
-  elements.filterTabs.forEach((tab) => {
+  el.filterTabs.forEach((tab) => {
     tab.addEventListener('click', () => {
-      elements.filterTabs.forEach((t) => t.classList.remove('active'));
+      el.filterTabs.forEach((t) => t.classList.remove('active'));
       tab.classList.add('active');
       state.activeFilter = tab.dataset.filter;
       renderLeadsList();
     });
   });
 
-  // Message Composer Switch
-  elements.modeInbound.addEventListener('click', () => {
+  // Mobile Chat vs Drafts Toggle
+  if (el.tabShowMessages && el.tabShowDrafts) {
+    el.tabShowMessages.addEventListener('click', () => setMobileChatPane('messages'));
+    el.tabShowDrafts.addEventListener('click', () => setMobileChatPane('drafts'));
+  }
+
+  // Composer Direction Toggle
+  el.modeInbound.addEventListener('click', () => {
     state.composerDir = 'them';
-    elements.modeInbound.classList.add('active');
-    elements.modeOutbound.classList.remove('active');
-    elements.messageTextInput.placeholder = 'Paste incoming DM from them (generates 3 drafts)...';
+    el.modeInbound.classList.add('active');
+    el.modeOutbound.classList.remove('active');
+    el.messageTextInput.placeholder = 'Paste their incoming DM here...';
   });
 
-  elements.modeOutbound.addEventListener('click', () => {
+  el.modeOutbound.addEventListener('click', () => {
     state.composerDir = 'pronoy';
-    elements.modeOutbound.classList.add('active');
-    elements.modeInbound.classList.remove('active');
-    elements.messageTextInput.placeholder = 'Type or paste reply sent by you...';
+    el.modeOutbound.classList.add('active');
+    el.modeInbound.classList.remove('active');
+    el.messageTextInput.placeholder = 'Type reply sent by you...';
   });
 
-  // Send Message Button & Enter Key
-  elements.btnSendMessage.addEventListener('click', handleSendMessage);
-  elements.messageTextInput.addEventListener('keydown', (e) => {
+  // Send Message button & Enter key
+  el.btnSendMessage.addEventListener('click', handleSendMessage);
+  el.messageTextInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -111,31 +123,60 @@ function initEventListeners() {
   });
 
   // Redraft Button
-  elements.btnRedraftCard.addEventListener('click', handleRedraft);
+  el.btnRedraftCard.addEventListener('click', handleRedraft);
 
-  // New Lead Button
-  elements.btnNewLead.addEventListener('click', openNewLeadModal);
+  // Edit & Delete Active Lead
+  el.btnEditLeadHeader.addEventListener('click', openEditLeadModal);
+  el.btnDeleteLeadHeader.addEventListener('click', handleDeleteActiveLead);
 
-  // Edit & Delete Lead
-  elements.btnEditLead.addEventListener('click', openEditLeadModal);
-  elements.btnDeleteLead.addEventListener('click', handleDeleteActiveLead);
+  // Bottom Navigation (Mobile)
+  if (el.navBtnChats) {
+    el.navBtnChats.addEventListener('click', () => {
+      el.navBtnChats.classList.add('active');
+      el.navBtnCrm.classList.remove('active');
+      switchView('inbox');
+    });
+  }
 
-  // CRM Table & Export CSV
-  elements.btnViewCrm.addEventListener('click', openCrmModal);
-  elements.btnExportCsv.addEventListener('click', downloadCsv);
+  if (el.navBtnCrm) {
+    el.navBtnCrm.addEventListener('click', () => {
+      el.navBtnCrm.classList.add('active');
+      el.navBtnChats.classList.remove('active');
+      switchView('crm');
+      renderCrmTable();
+    });
+  }
 
   // Lead Form Submit
-  elements.leadForm.addEventListener('submit', handleLeadFormSubmit);
+  el.leadForm.addEventListener('submit', handleLeadFormSubmit);
+}
 
-  // Mobile menu button
-  if (elements.mobileMenuBtn) {
-    elements.mobileMenuBtn.addEventListener('click', () => {
-      elements.sidebar.classList.toggle('open');
-    });
+// --- View Switching ---
+
+function switchView(viewName) {
+  state.currentView = viewName;
+  el.app.className = `mobile-view-${viewName}`;
+  window.scrollTo(0, 0);
+}
+
+function setMobileChatPane(paneName) {
+  state.mobileActivePane = paneName;
+  if (!el.chatDualContainer) return;
+
+  if (paneName === 'drafts') {
+    el.chatDualContainer.classList.add('show-drafts');
+    el.chatDualContainer.classList.remove('show-messages');
+    if (el.tabShowDrafts) el.tabShowDrafts.classList.add('active');
+    if (el.tabShowMessages) el.tabShowMessages.classList.remove('active');
+  } else {
+    el.chatDualContainer.classList.add('show-messages');
+    el.chatDualContainer.classList.remove('show-drafts');
+    if (el.tabShowMessages) el.tabShowMessages.classList.add('active');
+    if (el.tabShowDrafts) el.tabShowDrafts.classList.remove('active');
   }
 }
 
-// --- API Calls ---
+// --- API & State Handling ---
 
 async function loadLeads(selectId = null) {
   try {
@@ -146,45 +187,46 @@ async function loadLeads(selectId = null) {
 
     if (selectId) {
       selectLead(selectId);
-    } else if (state.leads.length > 0 && !state.activeLeadId) {
+    } else if (window.innerWidth >= 769 && state.leads.length > 0 && !state.activeLeadId) {
       selectLead(state.leads[0].igsid);
     }
   } catch (err) {
     console.error('Failed to load leads:', err);
-    showToast('Failed to load leads');
+    showToast('Failed to load chats');
   }
 }
 
 async function selectLead(igsid) {
   state.activeLeadId = igsid;
-  if (elements.sidebar) elements.sidebar.classList.remove('open');
   renderLeadsList();
-
-  elements.noLeadSelected.classList.add('hidden');
-  elements.leadActiveView.classList.remove('hidden');
+  switchView('chat');
+  setMobileChatPane('messages');
 
   try {
     const res = await fetch(`/api/leads/${igsid}`);
     if (!res.ok) throw new Error('Lead not found');
     const data = await res.json();
-    renderActiveLead(data.lead, data.messages, data.open_approval);
+    renderActiveChat(data.lead, data.messages, data.open_approval);
   } catch (err) {
-    console.error('Failed to fetch lead details:', err);
-    showToast('Failed to load lead details');
+    console.error('Failed to load lead details:', err);
+    showToast('Failed to open chat');
   }
 }
 
 async function handleSendMessage() {
-  const text = elements.messageTextInput.value.trim();
+  const text = el.messageTextInput.value.trim();
   if (!text || !state.activeLeadId) return;
 
-  elements.messageTextInput.value = '';
+  el.messageTextInput.value = '';
   const dir = state.composerDir;
 
-  // Show AI loader if inbound
   if (dir === 'them') {
-    elements.draftsLoading.classList.remove('hidden');
-    elements.draftsContainer.innerHTML = '';
+    el.draftsLoading.classList.remove('hidden');
+    el.draftsContainer.innerHTML = '';
+    // Automatically focus on drafts tab on mobile if an inbound message arrives!
+    if (window.innerWidth < 769) {
+      setMobileChatPane('drafts');
+    }
   }
 
   try {
@@ -195,34 +237,38 @@ async function handleSendMessage() {
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Failed to send message');
+    if (!res.ok) throw new Error(data.detail || 'Message failed');
 
-    renderActiveLead(data.lead, data.messages, data.drafts ? { drafts: data.drafts.drafts, read: data.drafts.read, stage: data.drafts.stage, id: data.drafts.approval_id } : null);
-    loadLeads(); // refresh sidebar list snippet
+    renderActiveChat(
+      data.lead,
+      data.messages,
+      data.drafts ? { drafts: data.drafts.drafts, read: data.drafts.read, stage: data.drafts.stage, id: data.drafts.approval_id } : null
+    );
+    loadLeads();
   } catch (err) {
-    console.error('Failed to send message:', err);
+    console.error('Message error:', err);
     showToast(`Error: ${err.message}`);
   } finally {
-    elements.draftsLoading.classList.add('hidden');
+    el.draftsLoading.classList.add('hidden');
   }
 }
 
 async function handleRedraft() {
   if (!state.activeLeadId) return;
-  elements.draftsLoading.classList.remove('hidden');
-  elements.draftsContainer.innerHTML = '';
+  el.draftsLoading.classList.remove('hidden');
+  el.draftsContainer.innerHTML = '';
 
   try {
     const res = await fetch(`/api/leads/${state.activeLeadId}/redraft`, { method: 'POST' });
     const data = await res.json();
     if (!res.ok) throw new Error('Redrafting failed');
     renderDrafts(data.drafts.drafts, data.drafts.approval_id);
-    renderConversion(data.lead);
+    renderConversionBanner(data.lead);
+    showToast('Generated 3 fresh angles!');
   } catch (err) {
-    console.error('Redraft failed:', err);
     showToast('Redrafting failed');
   } finally {
-    elements.draftsLoading.classList.add('hidden');
+    el.draftsLoading.classList.add('hidden');
   }
 }
 
@@ -235,8 +281,9 @@ async function handleApproveDraft(approvalId, text) {
       body: JSON.stringify({ approval_id: approvalId, text }),
     });
     const data = await res.json();
-    renderActiveLead(data.lead, data.messages, null);
-    showToast('Reply marked as sent!');
+    renderActiveChat(data.lead, data.messages, null);
+    showToast('Marked as sent!');
+    setMobileChatPane('messages');
     loadLeads();
   } catch (err) {
     showToast('Failed to mark sent');
@@ -250,31 +297,30 @@ async function handleDeleteActiveLead() {
   try {
     const res = await fetch(`/api/leads/${state.activeLeadId}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Delete failed');
-    showToast('Lead deleted');
+    showToast('Conversation deleted');
     state.activeLeadId = null;
-    elements.leadActiveView.classList.add('hidden');
-    elements.noLeadSelected.classList.remove('hidden');
+    switchView('inbox');
     loadLeads();
   } catch (err) {
-    showToast('Failed to delete lead');
+    showToast('Failed to delete');
   }
 }
 
 async function handleLeadFormSubmit(e) {
   e.preventDefault();
-  const igsid = elements.formIgsid.value;
+  const igsid = el.formIgsid.value;
   const isEdit = Boolean(igsid);
 
   const payload = {
-    handle: elements.formHandle.value.trim(),
-    podcast_name: elements.formPodcast.value.trim() || null,
-    audience_size: elements.formAudience.value.trim() || null,
-    bio: elements.formBio.value.trim() || null,
-    notes: elements.formNotes.value.trim() || '',
+    handle: el.formHandle.value.trim(),
+    podcast_name: el.formPodcast.value.trim() || null,
+    audience_size: el.formAudience.value.trim() || null,
+    bio: el.formBio.value.trim() || null,
+    notes: el.formNotes.value.trim() || '',
   };
 
   if (!isEdit) {
-    payload.initial_message = elements.formInitialMsg.value.trim() || null;
+    payload.initial_message = el.formInitialMsg.value.trim() || null;
   }
 
   try {
@@ -290,9 +336,10 @@ async function handleLeadFormSubmit(e) {
     if (!res.ok) throw new Error(data.detail || 'Save failed');
 
     closeLeadModal();
-    showToast(isEdit ? 'Lead updated!' : 'Lead created!');
+    showToast(isEdit ? 'Lead updated!' : 'Chat created!');
     const targetId = isEdit ? igsid : data.igsid;
     loadLeads(targetId);
+    selectLead(targetId);
   } catch (err) {
     showToast(`Error: ${err.message}`);
   }
@@ -302,14 +349,12 @@ async function handleLeadFormSubmit(e) {
 
 function renderLeadsList() {
   let filtered = state.leads.filter((l) => {
-    // Search query
     const matchSearch =
       !state.searchQuery ||
       (l.handle && l.handle.toLowerCase().includes(state.searchQuery)) ||
       (l.podcast_name && l.podcast_name.toLowerCase().includes(state.searchQuery)) ||
       (l.bio && l.bio.toLowerCase().includes(state.searchQuery));
 
-    // Filter tab
     let matchFilter = true;
     if (state.activeFilter === 'hot') {
       matchFilter = (l.conversion_probability || 50) >= 70;
@@ -323,77 +368,59 @@ function renderLeadsList() {
   });
 
   if (filtered.length === 0) {
-    elements.leadsList.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.8rem;">No conversations found</div>';
+    el.leadsList.innerHTML = '<div style="padding: 30px 14px; text-align: center; color: var(--text-dim); font-size: 0.86rem;">No conversations found.<br><br>Tap <b>+ New Chat</b> to create one!</div>';
     return;
   }
 
-  elements.leadsList.innerHTML = filtered
+  el.leadsList.innerHTML = filtered
     .map((lead) => {
       const activeClass = lead.igsid === state.activeLeadId ? 'active' : '';
       const prob = lead.conversion_probability || 50;
-      let scoreClass = '';
-      if (prob >= 75) scoreClass = 'score-hot';
-      if (lead.status === 'active_client') scoreClass = 'score-won';
-
       const lastSnippet = lead.last_message ? lead.last_message.text : 'No messages yet';
 
       return `
-        <div class="lead-item ${activeClass}" onclick="selectLead('${lead.igsid}')">
-          <div class="lead-item-top">
-            <span class="lead-item-handle">${escapeHtml(lead.handle || lead.igsid)}</span>
-            <span class="lead-item-score ${scoreClass}">🔥 ${prob}%</span>
+        <div class="lead-card-item ${activeClass}" onclick="selectLead('${lead.igsid}')">
+          <div class="lead-card-top">
+            <span class="lead-card-handle">${escapeHtml(lead.handle || lead.igsid)}</span>
+            <span class="lead-card-score">🔥 ${prob}%</span>
           </div>
-          <div class="lead-item-podcast">${escapeHtml(lead.podcast_name || lead.bio || 'New Lead')}</div>
-          <div class="lead-item-snippet">${escapeHtml(lastSnippet)}</div>
+          <div class="lead-card-podcast">${escapeHtml(lead.podcast_name || lead.bio || 'New Lead')}</div>
+          <div class="lead-card-snippet">${escapeHtml(lastSnippet)}</div>
         </div>
       `;
     })
     .join('');
 }
 
-function renderActiveLead(lead, messages, openApproval) {
+function renderActiveChat(lead, messages, openApproval) {
   // Header
   const handle = lead.handle || lead.igsid;
-  elements.activeLeadHandle.textContent = handle;
-  elements.activeLeadAvatar.textContent = handle.replace('@', '').charAt(0).toUpperCase() || '@';
-  elements.activeLeadStageBadge.textContent = lead.status || 'first_contact';
-  elements.activeLeadPodcast.textContent = lead.podcast_name || 'Show name unset';
-  elements.activeLeadAudience.textContent = lead.audience_size ? `${lead.audience_size} followers` : 'Audience unset';
+  el.headerHandle.textContent = handle;
+  el.headerStageBadge.textContent = lead.status || 'first_contact';
 
-  // Conversion Card
-  renderConversion(lead);
+  // Banner
+  renderConversionBanner(lead);
 
-  // Chat Bubbles
+  // Messages
   renderMessages(messages || []);
 
   // AI Drafts
   if (openApproval && openApproval.drafts && openApproval.drafts.length > 0) {
     renderDrafts(openApproval.drafts, openApproval.id);
+    if (el.draftCountBadge) el.draftCountBadge.textContent = openApproval.drafts.length;
   } else {
-    elements.draftsContainer.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 0.82rem;">Paste an incoming DM on the left to generate 3 strategic options with Gemini 3.7 Flash.</div>';
+    el.draftsContainer.innerHTML = '<div style="padding: 30px 14px; text-align: center; color: var(--text-dim); font-size: 0.85rem;">Paste an incoming DM to generate 3 strategic options with Gemini 3.7 Flash.</div>';
+    if (el.draftCountBadge) el.draftCountBadge.textContent = '0';
   }
 }
 
-function renderConversion(lead) {
+function renderConversionBanner(lead) {
   const prob = lead.conversion_probability || 50;
-  elements.conversionScore.textContent = `${prob}%`;
-  elements.conversionBar.style.width = `${prob}%`;
-
-  if (prob >= 75) {
-    elements.conversionTag.textContent = '🔥 High Buying Intent';
-    elements.conversionTag.style.color = 'var(--accent-amber)';
-    elements.conversionBar.style.background = 'linear-gradient(90deg, #f59e0b, #10b981)';
-  } else if (prob >= 45) {
-    elements.conversionTag.textContent = '⚡ Active Conversation';
-    elements.conversionTag.style.color = 'var(--accent-cyan)';
-    elements.conversionBar.style.background = 'linear-gradient(90deg, #06b6d4, #3b82f6)';
-  } else {
-    elements.conversionTag.textContent = '🌱 Nurturing Stage';
-    elements.conversionTag.style.color = 'var(--text-muted)';
-    elements.conversionBar.style.background = 'linear-gradient(90deg, #64748b, #94a3b8)';
-  }
-
-  elements.conversionRationale.textContent = lead.conversion_rationale || lead.needs || 'Analyzing conversation stage and lead cues...';
+  el.bannerScore.textContent = `${prob}%`;
+  el.conversionProgressBar.style.width = `${prob}%`;
+  el.bannerPodcast.textContent = lead.podcast_name || 'Podcast Show';
+  el.bannerAudience.textContent = lead.audience_size ? `${lead.audience_size} followers` : 'Audience unset';
+  el.bannerRationale.textContent = lead.conversion_rationale || lead.needs || 'Analyzing conversation stage...';
 
   let signals = [];
   try {
@@ -403,19 +430,19 @@ function renderConversion(lead) {
   }
 
   if (signals.length > 0) {
-    elements.buyingSignalsList.innerHTML = signals.map((s) => `<span class="signal-tag">✓ ${escapeHtml(s)}</span>`).join('');
+    el.bannerSignals.innerHTML = signals.map((s) => `<span class="signal-pill">✓ ${escapeHtml(s)}</span>`).join('');
   } else {
-    elements.buyingSignalsList.innerHTML = `<span class="signal-tag">Stage: ${lead.status || 'first_contact'}</span>`;
+    el.bannerSignals.innerHTML = `<span class="signal-pill">Stage: ${lead.status || 'first_contact'}</span>`;
   }
 }
 
 function renderMessages(messages) {
   if (messages.length === 0) {
-    elements.messagesContainer.innerHTML = '<div style="margin: auto; color: var(--text-muted); font-size: 0.85rem; text-align: center;">No messages yet. Paste their DM below to start!</div>';
+    el.messagesContainer.innerHTML = '<div style="margin: auto; color: var(--text-dim); font-size: 0.88rem; text-align: center; padding: 20px;">No messages yet.<br>Paste their incoming DM below!</div>';
     return;
   }
 
-  elements.messagesContainer.innerHTML = messages
+  el.messagesContainer.innerHTML = messages
     .map((m) => {
       const isThem = m.direction === 'them';
       const bubbleClass = isThem ? 'msg-inbound' : 'msg-outbound';
@@ -430,17 +457,16 @@ function renderMessages(messages) {
     })
     .join('');
 
-  // Scroll to bottom
-  elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
+  el.messagesContainer.scrollTop = el.messagesContainer.scrollHeight;
 }
 
 function renderDrafts(drafts, approvalId) {
   if (!drafts || drafts.length === 0) {
-    elements.draftsContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">No drafts available.</div>';
+    el.draftsContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-dim);">No drafts available.</div>';
     return;
   }
 
-  elements.draftsContainer.innerHTML = drafts
+  el.draftsContainer.innerHTML = drafts
     .map((draft, idx) => {
       const tone = draft.tone || 'warm';
       const title = TONE_LABELS[tone] || `Option ${idx + 1}`;
@@ -449,89 +475,76 @@ function renderDrafts(drafts, approvalId) {
       return `
         <div class="draft-card">
           <div class="draft-card-header">
-            <span class="draft-tone ${toneClass}">${title}</span>
-            <div class="draft-actions">
-              <button class="btn btn-sm btn-secondary" onclick="copyDraftText(this, \`${escapeJsString(draft.text)}\`)">
-                📋 Copy
-              </button>
-              <button class="btn btn-sm btn-primary" onclick="handleApproveDraft('${approvalId}', \`${escapeJsString(draft.text)}\`)">
-                ✅ Mark Sent
-              </button>
-            </div>
+            <span class="draft-tone-title ${toneClass}">${title}</span>
           </div>
-          <div class="draft-text">${escapeHtml(draft.text)}</div>
+          <div class="draft-text-content">${escapeHtml(draft.text)}</div>
+          <div class="draft-button-row">
+            <button class="btn-copy-draft" onclick="copyDraftText(this, \`${escapeJsString(draft.text)}\`)">
+              📋 1-Tap Copy
+            </button>
+            <button class="btn btn-primary btn-mark-sent" onclick="handleApproveDraft('${approvalId}', \`${escapeJsString(draft.text)}\`)">
+              ✅ Mark Sent
+            </button>
+          </div>
         </div>
       `;
     })
     .join('');
 }
 
-// --- Modals & Utilities ---
+function renderCrmTable() {
+  el.crmTableBody.innerHTML = state.leads
+    .map((l) => {
+      const prob = l.conversion_probability || 50;
+      const lastDate = l.updated_at ? new Date(l.updated_at * 1000).toLocaleDateString() : '-';
+      return `
+        <tr onclick="selectLead('${l.igsid}');" style="cursor: pointer;">
+          <td><b>${escapeHtml(l.handle || l.igsid)}</b></td>
+          <td>${escapeHtml(l.podcast_name || '-')}</td>
+          <td><span class="badge">${escapeHtml(l.status || 'first_contact')}</span></td>
+          <td><b>🔥 ${prob}%</b></td>
+          <td>${escapeHtml(l.audience_size || '-')}</td>
+          <td>${escapeHtml(l.price || 'not discussed')}</td>
+          <td>${l.message_count || 0}</td>
+          <td>${lastDate}</td>
+        </tr>
+      `;
+    })
+    .join('');
+}
+
+// --- Modals & Utility ---
 
 function openNewLeadModal() {
-  elements.formIgsid.value = '';
-  elements.formHandle.value = '';
-  elements.formPodcast.value = '';
-  elements.formAudience.value = '';
-  elements.formBio.value = '';
-  elements.formInitialMsg.value = '';
-  elements.formNotes.value = '';
-  elements.modalTitle.textContent = 'New Lead Conversation';
-  elements.initialMsgGroup.classList.remove('hidden');
-  elements.leadModal.classList.remove('hidden');
+  el.formIgsid.value = '';
+  el.formHandle.value = '';
+  el.formPodcast.value = '';
+  el.formAudience.value = '';
+  el.formBio.value = '';
+  el.formInitialMsg.value = '';
+  el.formNotes.value = '';
+  el.modalTitle.textContent = 'New Lead Conversation';
+  el.initialMsgGroup.classList.remove('hidden');
+  el.leadModal.classList.remove('hidden');
 }
 
 function openEditLeadModal() {
   const lead = state.leads.find((l) => l.igsid === state.activeLeadId);
   if (!lead) return;
 
-  elements.formIgsid.value = lead.igsid;
-  elements.formHandle.value = lead.handle || '';
-  elements.formPodcast.value = lead.podcast_name || '';
-  elements.formAudience.value = lead.audience_size || '';
-  elements.formBio.value = lead.bio || '';
-  elements.formNotes.value = lead.notes || '';
-  elements.modalTitle.textContent = `Edit Lead ${lead.handle || ''}`;
-  elements.initialMsgGroup.classList.add('hidden');
-  elements.leadModal.classList.remove('hidden');
+  el.formIgsid.value = lead.igsid;
+  el.formHandle.value = lead.handle || '';
+  el.formPodcast.value = lead.podcast_name || '';
+  el.formAudience.value = lead.audience_size || '';
+  el.formBio.value = lead.bio || '';
+  el.formNotes.value = lead.notes || '';
+  el.modalTitle.textContent = `Edit Lead ${lead.handle || ''}`;
+  el.initialMsgGroup.classList.add('hidden');
+  el.leadModal.classList.remove('hidden');
 }
 
 function closeLeadModal() {
-  elements.leadModal.classList.add('hidden');
-}
-
-async function openCrmModal() {
-  elements.crmModal.classList.remove('hidden');
-  try {
-    const res = await fetch('/api/leads');
-    const data = await res.json();
-    const leads = data.leads || [];
-
-    elements.crmTableBody.innerHTML = leads
-      .map((l) => {
-        const prob = l.conversion_probability || 50;
-        const lastDate = l.updated_at ? new Date(l.updated_at * 1000).toLocaleDateString() : '-';
-        return `
-          <tr onclick="selectLead('${l.igsid}'); closeCrmModal();" style="cursor: pointer;">
-            <td><b>${escapeHtml(l.handle || l.igsid)}</b></td>
-            <td>${escapeHtml(l.podcast_name || '-')}</td>
-            <td><span class="badge">${escapeHtml(l.status || 'first_contact')}</span></td>
-            <td><b>🔥 ${prob}%</b></td>
-            <td>${escapeHtml(l.audience_size || '-')}</td>
-            <td>${escapeHtml(l.price || 'not discussed')}</td>
-            <td>${l.message_count || 0}</td>
-            <td>${lastDate}</td>
-          </tr>
-        `;
-      })
-      .join('');
-  } catch (err) {
-    showToast('Failed to load CRM data');
-  }
-}
-
-function closeCrmModal() {
-  elements.crmModal.classList.add('hidden');
+  el.leadModal.classList.add('hidden');
 }
 
 function downloadCsv() {
@@ -540,13 +553,13 @@ function downloadCsv() {
 
 function copyDraftText(button, text) {
   navigator.clipboard.writeText(text).then(() => {
-    const originalText = button.innerHTML;
-    button.innerHTML = '✓ Copied!';
-    button.style.backgroundColor = 'var(--accent-emerald)';
+    const orig = button.innerHTML;
+    button.innerHTML = '✓ Copied to Clipboard!';
+    button.style.backgroundColor = 'var(--emerald-accent)';
     button.style.color = '#ffffff';
-    showToast('Copied to clipboard!');
+    showToast('Copied! Ready to paste in Instagram');
     setTimeout(() => {
-      button.innerHTML = originalText;
+      button.innerHTML = orig;
       button.style.backgroundColor = '';
       button.style.color = '';
     }, 2000);
@@ -554,10 +567,10 @@ function copyDraftText(button, text) {
 }
 
 function showToast(msg) {
-  elements.toast.textContent = msg;
-  elements.toast.classList.remove('hidden');
+  el.toast.textContent = msg;
+  el.toast.classList.remove('hidden');
   setTimeout(() => {
-    elements.toast.classList.add('hidden');
+    el.toast.classList.add('hidden');
   }, 2400);
 }
 

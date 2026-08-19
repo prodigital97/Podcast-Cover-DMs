@@ -2,204 +2,253 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Podcast Cover DM Copilot & CRM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎙️</text></svg>">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0d1117">
 </head>
 <body>
-  <div id="app">
-    <!-- Top Navigation Bar -->
+  <div id="app" class="mobile-view-inbox">
+    
+    <!-- Top Header -->
     <header class="app-header">
       <div class="header-left">
-        <button id="mobile-menu-btn" class="icon-btn mobile-only" title="Toggle leads list">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+        <!-- Back button (visible in chat view on mobile) -->
+        <button id="btn-back-to-inbox" class="icon-btn header-back-btn" title="Back to Inbox">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <div class="brand">
-          <span class="brand-icon">🎙️</span>
-          <div class="brand-text">
-            <h1>Podcast Cover Studio</h1>
-            <span class="brand-badge">DM Copilot & CRM</span>
+        
+        <!-- Header title (changes based on active view) -->
+        <div class="header-title-wrapper">
+          <div id="header-brand" class="header-brand">
+            <span class="brand-icon">🎙️</span>
+            <div class="brand-titles">
+              <h1>Podcast Cover Studio</h1>
+              <span class="brand-sub">DM Copilot & CRM</span>
+            </div>
+          </div>
+          <div id="header-chat-lead" class="header-chat-lead hidden">
+            <h2 id="header-handle">@username</h2>
+            <span id="header-stage-badge" class="badge">first_contact</span>
           </div>
         </div>
       </div>
+
       <div class="header-right">
-        <button id="btn-export-csv" class="btn btn-secondary" title="Export all leads to CSV / Google Sheets">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span>Export Sheet</span>
-        </button>
-        <button id="btn-view-crm" class="btn btn-secondary" title="View Full CRM Table">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-          <span class="desktop-only">CRM Table</span>
-        </button>
-        <button id="btn-new-lead" class="btn btn-primary" title="Add New Lead">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          <span>New Chat</span>
-        </button>
+        <!-- Chat specific actions -->
+        <div id="chat-header-actions" class="chat-header-actions hidden">
+          <button id="btn-edit-lead-header" class="icon-btn" title="Edit Lead">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </button>
+          <button id="btn-delete-lead-header" class="icon-btn btn-danger-hover" title="Delete Conversation">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+        <!-- Inbox / Desktop actions -->
+        <div id="inbox-header-actions" class="inbox-header-actions">
+          <button id="btn-export-csv" class="btn btn-secondary btn-sm" title="Export CSV">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span class="desktop-only">Export CSV</span>
+          </button>
+          <button id="btn-new-lead" class="btn btn-primary btn-sm" onclick="openNewLeadModal()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>New Chat</span>
+          </button>
+        </div>
       </div>
     </header>
 
-    <!-- Main Workspace Container -->
-    <main class="main-container">
-      <!-- Left Sidebar: Leads List -->
-      <aside id="sidebar" class="sidebar">
-        <div class="sidebar-search">
-          <input type="text" id="search-leads" placeholder="Search handles, podcasts, bio..." />
+    <!-- Main View Switcher Body -->
+    <main class="main-body">
+      
+      <!-- VIEW 1: Leads Inbox Screen -->
+      <section id="view-inbox" class="view-screen view-inbox">
+        <div class="inbox-search-bar">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="search-leads" placeholder="Search handles, podcasts, topics..." />
         </div>
-        <div class="filter-tabs">
-          <button class="filter-tab active" data-filter="all">All</button>
-          <button class="filter-tab" data-filter="hot">🔥 Hot (>70%)</button>
-          <button class="filter-tab" data-filter="green_light">🟢 Green Light</button>
-          <button class="filter-tab" data-filter="building">💬 Building</button>
+
+        <div class="filter-scroll">
+          <button class="pill-tab active" data-filter="all">All</button>
+          <button class="pill-tab" data-filter="hot">🔥 Hot (>70%)</button>
+          <button class="pill-tab" data-filter="green_light">🟢 Green Light</button>
+          <button class="pill-tab" data-filter="building">💬 Building</button>
         </div>
+
         <div id="leads-list" class="leads-list">
-          <div class="loading-spinner">Loading leads...</div>
-        </div>
-      </aside>
-
-      <!-- Center & Right: Chat Thread & AI Copilot -->
-      <section id="chat-workspace" class="chat-workspace">
-        <div id="no-lead-selected" class="empty-state">
-          <div class="empty-icon">💬</div>
-          <h2>Select a Lead or Start a New Chat</h2>
-          <p>Choose an ongoing conversation from the left or click <b>+ New Chat</b> to paste a DM and generate high-converting drafts with Gemini 3.7 Flash.</p>
-          <button class="btn btn-primary" onclick="openNewLeadModal()">+ Create New Chat Box</button>
-        </div>
-
-        <div id="lead-active-view" class="lead-active-view hidden">
-          <!-- Active Lead Header -->
-          <div class="lead-header">
-            <div class="lead-info">
-              <div class="lead-avatar" id="active-lead-avatar">@</div>
-              <div class="lead-titles">
-                <div class="lead-handle-row">
-                  <h2 id="active-lead-handle">@username</h2>
-                  <span id="active-lead-stage-badge" class="badge">first_contact</span>
-                </div>
-                <div class="lead-subdetails">
-                  <span id="active-lead-podcast">Podcast Name</span>
-                  <span class="dot-separator">•</span>
-                  <span id="active-lead-audience">0 followers</span>
-                </div>
-              </div>
-            </div>
-            <div class="lead-header-actions">
-              <button id="btn-edit-lead" class="btn btn-icon-only" title="Edit Lead Details">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-              </button>
-              <button id="btn-delete-lead" class="btn btn-icon-only btn-danger-hover" title="Delete Conversation">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- Conversion Probability & Strategy Bar -->
-          <div id="conversion-card" class="conversion-card">
-            <div class="conversion-top">
-              <div class="conversion-metric">
-                <span class="conversion-label">Conversion Likelihood</span>
-                <div class="conversion-score-wrapper">
-                  <span id="conversion-score" class="conversion-score">50%</span>
-                  <span id="conversion-tag" class="conversion-tag">⚡ Moderate Intent</span>
-                </div>
-              </div>
-              <div class="conversion-bar-container">
-                <div id="conversion-bar" class="conversion-bar" style="width: 50%;"></div>
-              </div>
-            </div>
-            <div class="conversion-details">
-              <p id="conversion-rationale" class="conversion-rationale">Analyzing conversation dynamics...</p>
-              <div id="buying-signals-list" class="signals-tags"></div>
-            </div>
-          </div>
-
-          <!-- Split Chat & Copilot Layout -->
-          <div class="chat-copilot-split">
-            <!-- Left: Messages Thread -->
-            <div class="thread-pane">
-              <div class="pane-title">Conversation History</div>
-              <div id="messages-container" class="messages-container">
-                <!-- Chat bubbles inserted here -->
-              </div>
-              <!-- Message Input Box -->
-              <div class="message-composer">
-                <div class="composer-type-switch">
-                  <button id="mode-inbound" class="type-btn active" data-dir="them">📥 Inbound (They sent this)</button>
-                  <button id="mode-outbound" class="type-btn" data-dir="pronoy">📤 Outbound (I sent this)</button>
-                </div>
-                <div class="composer-input-row">
-                  <textarea id="message-text-input" rows="2" placeholder="Paste incoming DM or type message..."></textarea>
-                  <button id="btn-send-message" class="btn btn-primary" title="Add message & generate drafts">
-                    <span>Send</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Right: AI Copilot Drafts -->
-            <div class="copilot-pane">
-              <div class="copilot-header">
-                <div class="pane-title">⚡ Gemini 3.7 Strategic Drafts</div>
-                <button id="btn-redraft-card" class="btn btn-sm btn-secondary" title="Regenerate 3 alternative drafts">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                  <span>Redraft</span>
-                </button>
-              </div>
-
-              <div id="drafts-loading" class="drafts-loading hidden">
-                <div class="ai-loader">
-                  <div class="loader-pulse"></div>
-                  <span>Gemini 3.7 is drafting 3 strategic options...</span>
-                </div>
-              </div>
-
-              <div id="drafts-container" class="drafts-container">
-                <!-- Draft Cards (Warm, Direct, Low Pressure) -->
-              </div>
-            </div>
-          </div>
+          <div class="loading-state">Loading your chats...</div>
         </div>
       </section>
+
+      <!-- VIEW 2: Active Chat Room Screen -->
+      <section id="view-chat" class="view-screen view-chat">
+        
+        <!-- Top Lead Banner & Conversion Score Meter -->
+        <div id="chat-lead-banner" class="chat-lead-banner">
+          <div class="banner-top">
+            <div class="banner-lead-details">
+              <span id="banner-podcast" class="banner-podcast">Podcast Show</span>
+              <span id="banner-audience" class="banner-audience">0 followers</span>
+            </div>
+            <div class="banner-score-pill">
+              <span class="score-label">Conversion:</span>
+              <span id="banner-score" class="score-val">50%</span>
+            </div>
+          </div>
+
+          <div class="conversion-progress-track">
+            <div id="conversion-progress-bar" class="conversion-progress-bar" style="width: 50%;"></div>
+          </div>
+
+          <div class="banner-insights">
+            <p id="banner-rationale" class="banner-rationale">Analyzing conversation cues...</p>
+            <div id="banner-signals" class="banner-signals"></div>
+          </div>
+        </div>
+
+        <!-- Segment Toggle: [ 💬 Chat History ] vs [ ⚡ AI Drafts (3) ] (Mobile Friendly) -->
+        <div class="chat-view-tabs mobile-only">
+          <button id="tab-show-messages" class="chat-tab active">💬 Chat Thread</button>
+          <button id="tab-show-drafts" class="chat-tab">⚡ Gemini 3.7 Drafts <span id="draft-count-badge" class="count-badge">3</span></button>
+        </div>
+
+        <!-- Chat Workspace Area -->
+        <div class="chat-dual-container">
+          
+          <!-- Column A: Messages Thread -->
+          <div id="pane-messages" class="pane-messages">
+            <div id="messages-container" class="messages-container">
+              <!-- Bubbles -->
+            </div>
+
+            <!-- Message Composer Form -->
+            <div class="message-composer">
+              <div class="composer-mode-bar">
+                <button id="mode-inbound" class="mode-pill active" data-dir="them">📥 Inbound (They sent this)</button>
+                <button id="mode-outbound" class="mode-pill" data-dir="pronoy">📤 Outbound (I sent this)</button>
+              </div>
+              <div class="composer-input-group">
+                <textarea id="message-text-input" rows="2" placeholder="Paste their incoming DM here..."></textarea>
+                <button id="btn-send-message" class="btn-send-circle" title="Submit Message & Draft">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column B: Gemini 3.7 Drafts -->
+          <div id="pane-drafts" class="pane-drafts">
+            <div class="copilot-section-header">
+              <div class="copilot-title">
+                <span>⚡ Strategic Reply Drafts</span>
+                <span class="model-badge">Gemini 3.7 Flash</span>
+              </div>
+              <button id="btn-redraft-card" class="btn-text-action" title="Regenerate drafts">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                <span>Redraft</span>
+              </button>
+            </div>
+
+            <div id="drafts-loading" class="drafts-loading hidden">
+              <div class="pulse-ring"></div>
+              <span>Gemini 3.7 is analyzing & drafting 3 options...</span>
+            </div>
+
+            <div id="drafts-container" class="drafts-container">
+              <!-- Draft Cards -->
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- VIEW 3: CRM Sheet Table View -->
+      <section id="view-crm" class="view-screen view-crm hidden">
+        <div class="crm-top-bar">
+          <h2>📊 Lead CRM & Pipeline</h2>
+          <button class="btn btn-primary btn-sm" onclick="downloadCsv()">📥 Download CSV</button>
+        </div>
+        <div class="crm-table-container">
+          <table class="crm-table">
+            <thead>
+              <tr>
+                <th>Handle</th>
+                <th>Podcast</th>
+                <th>Stage</th>
+                <th>Conversion %</th>
+                <th>Audience</th>
+                <th>Quoted</th>
+                <th>Msgs</th>
+                <th>Last Active</th>
+              </tr>
+            </thead>
+            <tbody id="crm-table-body">
+              <!-- CRM rows -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
     </main>
 
-    <!-- Modal: Create / Edit Lead -->
+    <!-- Bottom Navigation Bar for Mobile -->
+    <nav class="bottom-nav mobile-only">
+      <button id="nav-btn-chats" class="nav-item active">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Chats</span>
+      </button>
+      <button id="nav-btn-new" class="nav-item nav-action-center" onclick="openNewLeadModal()">
+        <div class="nav-fab">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+      </button>
+      <button id="nav-btn-crm" class="nav-item">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        <span>CRM Table</span>
+      </button>
+    </nav>
+
+    <!-- Modal: New / Edit Lead (Mobile Bottom-Sheet Style) -->
     <div id="lead-modal" class="modal hidden">
       <div class="modal-overlay" onclick="closeLeadModal()"></div>
-      <div class="modal-content">
+      <div class="modal-sheet">
+        <div class="sheet-handle"></div>
         <div class="modal-header">
           <h3 id="modal-title">New Lead Conversation</h3>
           <button class="modal-close" onclick="closeLeadModal()">&times;</button>
         </div>
-        <form id="lead-form" class="modal-body">
+        <form id="lead-form" class="modal-form">
           <input type="hidden" id="form-igsid" />
-          <div class="form-group">
+          <div class="form-row">
             <label for="form-handle">Instagram Handle *</label>
-            <input type="text" id="form-handle" placeholder="@creatorshow" required />
+            <input type="text" id="form-handle" placeholder="@creatorshow" required autocomplete="off" />
           </div>
-          <div class="form-group">
-            <label for="form-podcast">Podcast / Show Title</label>
-            <input type="text" id="form-podcast" placeholder="e.g. Founder Stories" />
+          <div class="form-row">
+            <label for="form-podcast">Podcast Show Title</label>
+            <input type="text" id="form-podcast" placeholder="e.g. The Creator Show" />
           </div>
-          <div class="form-group">
-            <label for="form-audience">Audience / Followers</label>
-            <input type="text" id="form-audience" placeholder="e.g. 15,000" />
+          <div class="form-row">
+            <label for="form-audience">Followers / Audience Size</label>
+            <input type="text" id="form-audience" placeholder="e.g. 25,000" />
           </div>
-          <div class="form-group">
+          <div class="form-row">
             <label for="form-bio">Bio & Topics</label>
-            <textarea id="form-bio" rows="2" placeholder="e.g. Weekly interviews with tech founders, business advice"></textarea>
+            <textarea id="form-bio" rows="2" placeholder="e.g. Business podcast interviewing founders"></textarea>
           </div>
-          <div class="form-group" id="initial-msg-group">
-            <label for="form-initial-msg">Initial Inbound DM (Optional)</label>
-            <textarea id="form-initial-msg" rows="2" placeholder="Paste their first DM to automatically generate 3 drafts!"></textarea>
+          <div class="form-row" id="initial-msg-group">
+            <label for="form-initial-msg">Initial DM Message (Optional)</label>
+            <textarea id="form-initial-msg" rows="2" placeholder="Paste their first DM to auto-generate 3 drafts immediately!"></textarea>
           </div>
-          <div class="form-group">
+          <div class="form-row">
             <label for="form-notes">Private Notes / Pricing Quoted</label>
-            <input type="text" id="form-notes" placeholder="e.g. Quoted £300 for full rebrand + YouTube pack" />
+            <input type="text" id="form-notes" placeholder="e.g. Quoted £250 for rebrand" />
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" onclick="closeLeadModal()">Cancel</button>
@@ -209,43 +258,9 @@
       </div>
     </div>
 
-    <!-- Modal: CRM Table View -->
-    <div id="crm-modal" class="modal hidden">
-      <div class="modal-overlay" onclick="closeCrmModal()"></div>
-      <div class="modal-content modal-xl">
-        <div class="modal-header">
-          <h3>📊 Lead Pipeline & Conversion Sheet</h3>
-          <div class="modal-actions">
-            <button class="btn btn-sm btn-primary" onclick="downloadCsv()">📥 Download CSV</button>
-            <button class="modal-close" onclick="closeCrmModal()">&times;</button>
-          </div>
-        </div>
-        <div class="modal-body p-0">
-          <div class="table-wrapper">
-            <table class="crm-table">
-              <thead>
-                <tr>
-                  <th>Handle</th>
-                  <th>Podcast</th>
-                  <th>Stage</th>
-                  <th>Conversion %</th>
-                  <th>Audience</th>
-                  <th>Quoted</th>
-                  <th>Msgs</th>
-                  <th>Last Active</th>
-                </tr>
-              </thead>
-              <tbody id="crm-table-body">
-                <!-- Leads rows inserted here -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Toast Notification -->
     <div id="toast" class="toast hidden">Copied to clipboard!</div>
+
   </div>
 
   <script src="/static/app.js"></script>
