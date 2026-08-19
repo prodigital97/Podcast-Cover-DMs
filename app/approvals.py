@@ -1,7 +1,6 @@
-"""Orchestration: inbound DM -> drafts -> Telegram card -> approved reply -> Instagram."""
-from __future__ import annotations
-
+import html
 import logging
+import time
 
 from app import db
 from app.drafting import REDRAFT_NUDGE, draft, infer_voice_notes
@@ -9,6 +8,23 @@ from app.instagram import InstagramClient
 from app.telegram import TelegramClient
 
 log = logging.getLogger(__name__)
+
+
+async def handle_telegram_draft(text: str, telegram: TelegramClient) -> str:
+    """Draft 3 replies on-demand when the user types or pastes a DM into Telegram."""
+    igsid = f"manual_{int(time.time())}"
+    db.upsert_lead(igsid, handle="Manual Lead", status="first_contact")
+    db.add_message(igsid, "them", text)
+    lead = db.get_lead(igsid)
+
+    drafts = await draft(lead, text, db.thread(igsid))
+    _apply_lead_update(igsid, drafts)
+
+    approval_id = db.create_approval(igsid, text, drafts.model_dump())
+    approval = db.get_approval(approval_id)
+    message_id = await telegram.send_approval(db.get_lead(igsid), approval)
+    db.set_approval_message_id(approval_id, message_id)
+    return approval_id
 
 
 async def ensure_lead(igsid: str, instagram: InstagramClient) -> dict:
@@ -107,11 +123,15 @@ async def send_approved(
         raise RuntimeError("already sent")
 
     igsid = approval["igsid"]
-    await instagram.send_text(igsid, text, last_inbound_at=db.last_inbound_at(igsid))
+    if not igsid.startswith("manual_"):
+        await instagram.send_text(igsid, text, last_inbound_at=db.last_inbound_at(igsid))
     db.add_message(igsid, "pronoy", text)
     db.set_approval_state(approval_id, "sent", sent_text=text)
     if approval["telegram_message_id"]:
-        await telegram.clear_keyboard(approval["telegram_message_id"], "✅ Sent.")
+        status_text = "✅ Sent." if not igsid.startswith("manual_") else "📋 Approved."
+        await telegram.clear_keyboard(approval["telegram_message_id"], status_text)
+    if igsid.startswith("manual_"):
+        await telegram.send(f"📋 <b>Tap to copy reply:</b>\n\n<code>{html.escape(text)}</code>")
 
 
 async def redraft(approval_id: str, instagram: InstagramClient, telegram: TelegramClient) -> None:

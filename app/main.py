@@ -152,21 +152,35 @@ async def _process_callback(callback: dict) -> None:
 
 
 async def _process_message(message: dict) -> None:
-    """A typed reply. Only meaningful while an approval is awaiting edited text."""
+    """A typed reply. If an approval is awaiting edit, send edited text.
+    Otherwise, draft 3 strategic reply options for the typed or pasted message."""
     if not _authorised((message.get("chat") or {}).get("id")):
         return
     text = (message.get("text") or "").strip()
     if not text:
         return
 
+    if text.lower() in {"/start", "/help"}:
+        await telegram.send(
+            "👋 <b>Podcast Cover DM Copilot Active!</b>\n\n"
+            "• Incoming Instagram DMs arrive here automatically.\n"
+            "• You can also <b>paste any DM thread or message here right now</b> to draft 3 strategic reply options instantly!"
+        )
+        return
+
     approval = db.awaiting_edit()
-    if not approval:
-        await telegram.send("No draft is waiting on an edit right now.")
+    if approval:
+        try:
+            await approvals.send_approved(approval["id"], text, instagram, telegram)
+        except Exception as exc:
+            log.exception("sending an edited reply failed")
+            db.set_approval_state(approval["id"], "open")
+            await telegram.send(f"⚠️ {exc}")
         return
 
     try:
-        await approvals.send_approved(approval["id"], text, instagram, telegram)
+        await telegram.send("🤖 Drafting 3 strategic reply options with Gemini…")
+        await approvals.handle_telegram_draft(text, telegram)
     except Exception as exc:
-        log.exception("sending an edited reply failed")
-        db.set_approval_state(approval["id"], "open")
-        await telegram.send(f"⚠️ {exc}")
+        log.exception("on-demand drafting failed in Telegram")
+        await telegram.send(f"⚠️ Drafting failed: {exc}")
