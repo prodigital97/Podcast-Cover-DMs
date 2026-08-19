@@ -33,6 +33,7 @@ telegram = TelegramClient()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     db.init()
     yield
     await instagram.aclose()
