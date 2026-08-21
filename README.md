@@ -91,15 +91,43 @@ automated cold DMs are what gets accounts actioned, and the account is the asset
 
 ## Approving
 
-Each card shows who they are, what they sent, the model's read of it, and three drafts.
+Each card leads with the things that change the decision: who they are, how far into
+the conversation this is, **how long is left to reply**, what they sent and how long
+it was, the model's read, then three drafts with word counts.
 
-- **Send 1/2/3** — delivers that draft as-is.
-- **Edit** — reply to the bot with your own text; that goes instead.
+```
+📩 @mercer.mechanical · 6.2k · Green light
+their 4th message · ⏳ 22h left
+```
+
+- **1 · Warm / 2 · Direct / 3 · Low-key** — sends that draft as-is. The buttons name
+  the tone because by the time you have scrolled to them the drafts are off-screen.
+- **Edit** — reply with your own text. It comes back for confirmation before it goes
+  anywhere (see below).
 - **Redraft** — throws the three away and asks for a visibly different angle.
 - **Skip** — closes the card and sends nothing.
 
+A handled card **rewrites itself in place** to show the outcome and the text that
+actually went out, so the chat stays one entry per lead and the scrollback reads as
+a history of what was said and what came back.
+
 A card can only resolve once. If a send fails, the card stays open and the failure is
-reported in the thread rather than being swallowed.
+reported rather than swallowed.
+
+### Editing is a two-step on purpose
+
+Tapping **Edit** and typing does not send. The text comes back as a confirmation card
+with **Send** and **Cancel**.
+
+The single tap looks like friction, but the alternative had a real hazard: with an
+edit pending, *anything* typed into the bot chat was sent straight to a live prospect
+— including a stray note typed hours later, after you had forgotten a card was open.
+Nothing else here reaches Instagram without an explicit tap; this closes the one gap
+where something did.
+
+The reply-window countdown exists for the same reason. Instagram only allows a reply
+within 24 hours of their last message, the service enforces that on send, and without
+the countdown the first you would know about it is a failure.
 
 ## The stages
 

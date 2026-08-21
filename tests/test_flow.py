@@ -80,7 +80,9 @@ def test_approving_a_draft_sends_it_and_closes_the_card(stub_draft):
     assert instagram.sent == [("IG1", "direct draft")]
     assert db.get_approval(approval["id"])["state"] == "sent"
     assert db.thread("IG1").endswith("pronoy: direct draft")
-    assert telegram.cleared and telegram.cleared[0][1] == "✅ Sent."
+    assert telegram.resolved[0]["outcome"] == "✅ Sent to"
+    # The resolved card shows what actually went out, not just that something did.
+    assert telegram.resolved[0]["sent_text"] == "direct draft"
 
 
 def test_a_sent_approval_cannot_be_sent_again(stub_draft):
@@ -136,3 +138,64 @@ def test_voice_notes_are_inferred_from_how_they_actually_type(stub_draft):
     ))
     assert "lowercase" in db.get_lead("IG1")["voice_notes"]
     assert "no emoji" in db.get_lead("IG1")["voice_notes"]
+
+
+# --- edited replies must be confirmed, never fired off a bare typed line ----
+
+def test_a_typed_edit_is_staged_for_confirmation_not_sent(stub_draft):
+    instagram, telegram = FakeInstagram(), FakeTelegram()
+    run(approvals.handle_incoming("IG1", "hey", "m1", instagram, telegram))
+    approval = db.open_approval_for("IG1")
+    db.set_approval_state(approval["id"], "awaiting_edit")
+
+    run(approvals.stage_edit(approval["id"], "my own words", telegram))
+
+    assert instagram.sent == []                                    # nothing sent yet
+    assert telegram.confirms[0][2] == "my own words"               # shown back for review
+    assert db.get_approval(approval["id"])["state"] == "awaiting_confirm"
+
+
+def test_confirming_a_staged_edit_sends_exactly_that_text(stub_draft):
+    instagram, telegram = FakeInstagram(), FakeTelegram()
+    run(approvals.handle_incoming("IG1", "hey", "m1", instagram, telegram))
+    approval = db.open_approval_for("IG1")
+    db.set_approval_state(approval["id"], "awaiting_edit")
+    run(approvals.stage_edit(approval["id"], "my own words", telegram))
+
+    staged = db.get_approval(approval["id"])["sent_text"]
+    run(approvals.send_approved(approval["id"], staged, instagram, telegram))
+
+    assert instagram.sent == [("IG1", "my own words")]
+    assert db.thread("IG1").endswith("pronoy: my own words")
+
+
+def test_cancelling_an_edit_reopens_the_card_so_later_typing_is_inert(stub_draft):
+    # The hazard this closes: tap Edit, get distracted, then type anything at
+    # all in the bot chat hours later — it used to go straight to the lead.
+    instagram, telegram = FakeInstagram(), FakeTelegram()
+    run(approvals.handle_incoming("IG1", "hey", "m1", instagram, telegram))
+    approval = db.open_approval_for("IG1")
+    db.set_approval_state(approval["id"], "awaiting_edit")
+
+    run(approvals.cancel_edit(approval["id"], telegram))
+
+    assert db.get_approval(approval["id"])["state"] == "open"
+    assert db.awaiting_edit() is None          # nothing will swallow the next message
+    assert instagram.sent == []
+
+
+def test_the_card_is_given_the_context_it_needs_to_render(stub_draft):
+    instagram, telegram = FakeInstagram(), FakeTelegram()
+    run(approvals.handle_incoming("IG1", "hey", "m1", instagram, telegram))
+    context = telegram.card_context[0]
+    assert context["inbound_count"] == 1
+    assert context["last_inbound_at"] is not None
+
+
+def test_redraft_resolves_the_old_card_in_place(stub_draft):
+    instagram, telegram = FakeInstagram(), FakeTelegram()
+    run(approvals.handle_incoming("IG1", "hey", "m1", instagram, telegram))
+    first = db.open_approval_for("IG1")
+    run(approvals.redraft(first["id"], instagram, telegram))
+    assert telegram.resolved[0]["outcome"].endswith("Redrafted —")
+    assert telegram.resolved[0]["sent_text"] is None

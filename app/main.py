@@ -124,6 +124,9 @@ async def _process_callback(callback: dict) -> None:
     if approval["state"] in {"sent", "skipped", "superseded"}:
         await telegram.answer_callback(callback["id"], f"Already {approval['state']}.")
         return
+    if action in {"c", "k"} and approval["state"] not in {"awaiting_confirm", "awaiting_edit"}:
+        await telegram.answer_callback(callback["id"], "Nothing pending to confirm.")
+        return
 
     try:
         if action == "s":
@@ -134,9 +137,15 @@ async def _process_callback(callback: dict) -> None:
         elif action == "e":
             db.set_approval_state(approval_id, "awaiting_edit")
             await telegram.answer_callback(callback["id"], "Reply with your text.")
-            await telegram.send(
-                "✏️ Reply to this message with the text to send instead.", force_reply=True
+            await telegram.ask_for_edit(db.get_lead(approval["igsid"]), approval_id)
+        elif action == "c":
+            await telegram.answer_callback(callback["id"], "Sending…")
+            await approvals.send_approved(
+                approval_id, approval["sent_text"], instagram, telegram
             )
+        elif action == "k":
+            await telegram.answer_callback(callback["id"], "Cancelled.")
+            await approvals.cancel_edit(approval_id, telegram)
         elif action == "r":
             await telegram.answer_callback(callback["id"], "Redrafting…")
             await approvals.redraft(approval_id, instagram, telegram)
@@ -144,7 +153,10 @@ async def _process_callback(callback: dict) -> None:
             db.set_approval_state(approval_id, "skipped")
             await telegram.answer_callback(callback["id"], "Skipped.")
             if approval["telegram_message_id"]:
-                await telegram.clear_keyboard(approval["telegram_message_id"], "\U0001f6ab Skipped.")
+                await telegram.resolve_card(
+                    approval["telegram_message_id"],
+                    db.get_lead(approval["igsid"]), approval, "\U0001f6ab Skipped —",
+                )
     except Exception as exc:
         log.exception("callback %s failed", action)
         await telegram.send(f"⚠️ {exc}")
@@ -164,8 +176,9 @@ async def _process_message(message: dict) -> None:
         return
 
     try:
-        await approvals.send_approved(approval["id"], text, instagram, telegram)
+        # Staged for confirmation, never sent straight off a typed line.
+        await approvals.stage_edit(approval["id"], text, telegram)
     except Exception as exc:
-        log.exception("sending an edited reply failed")
+        log.exception("staging an edited reply failed")
         db.set_approval_state(approval["id"], "open")
         await telegram.send(f"⚠️ {exc}")

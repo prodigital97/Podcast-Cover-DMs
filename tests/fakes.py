@@ -27,23 +27,41 @@ class FakeInstagram:
 class FakeTelegram:
     def __init__(self):
         self.cards: list[tuple[dict, dict]] = []
+        self.card_context: list[dict] = []
+        self.edit_prompts: list[tuple[dict, str]] = []
+        self.confirms: list[tuple[dict, str, str]] = []
+        self.resolved: list[dict] = []
         self.messages: list[str] = []
         self.cleared: list[tuple[int, str]] = []
         self.answers: list[str] = []
         self._next_id = 100
 
-    async def send_approval(self, lead, approval):
+    async def send_approval(self, lead, approval, *, last_inbound_at=None, inbound_count=None):
         self.cards.append((lead, approval))
+        self.card_context.append({"last_inbound_at": last_inbound_at,
+                                  "inbound_count": inbound_count})
         self._next_id += 1
         return self._next_id
 
-    async def send(self, text, *, force_reply=False):
+    async def send(self, text, *, reply_markup=None):
         self.messages.append(text)
         self._next_id += 1
         return self._next_id
 
-    async def clear_keyboard(self, message_id, footer):
-        self.cleared.append((message_id, footer))
+    async def ask_for_edit(self, lead, approval_id):
+        self.edit_prompts.append((lead, approval_id))
+        self._next_id += 1
+        return self._next_id
+
+    async def ask_to_confirm(self, lead, approval_id, text):
+        self.confirms.append((lead, approval_id, text))
+        self._next_id += 1
+        return self._next_id
+
+    async def resolve_card(self, message_id, lead, approval, outcome, sent_text=None):
+        self.cleared.append((message_id, outcome))
+        self.resolved.append({"message_id": message_id, "outcome": outcome,
+                              "sent_text": sent_text})
 
     async def answer_callback(self, callback_id, text=""):
         self.answers.append(text)

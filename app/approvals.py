@@ -67,10 +67,20 @@ async def handle_incoming(
     _apply_lead_update(igsid, drafts)
 
     approval_id = db.create_approval(igsid, text, drafts.model_dump())
-    approval = db.get_approval(approval_id)
-    message_id = await telegram.send_approval(db.get_lead(igsid), approval)
-    db.set_approval_message_id(approval_id, message_id)
+    await _post_card(approval_id, igsid, telegram)
     return approval_id
+
+
+async def _post_card(approval_id: str, igsid: str, telegram: TelegramClient) -> None:
+    """Post an approval card with the context that makes it decidable at a glance:
+    how far into the conversation this is, and how long is left to reply."""
+    message_id = await telegram.send_approval(
+        db.get_lead(igsid),
+        db.get_approval(approval_id),
+        last_inbound_at=db.last_inbound_at(igsid),
+        inbound_count=db.inbound_count(igsid),
+    )
+    db.set_approval_message_id(approval_id, message_id)
 
 
 def _recent_inbound(igsid: str, limit: int = 8) -> list[str]:
@@ -111,7 +121,9 @@ async def send_approved(
     db.add_message(igsid, "pronoy", text)
     db.set_approval_state(approval_id, "sent", sent_text=text)
     if approval["telegram_message_id"]:
-        await telegram.clear_keyboard(approval["telegram_message_id"], "✅ Sent.")
+        await telegram.resolve_card(
+            approval["telegram_message_id"], db.get_lead(igsid), approval, "✅ Sent to", text
+        )
 
 
 async def redraft(approval_id: str, instagram: InstagramClient, telegram: TelegramClient) -> None:
@@ -127,8 +139,34 @@ async def redraft(approval_id: str, instagram: InstagramClient, telegram: Telegr
 
     db.set_approval_state(approval_id, "superseded")
     if approval["telegram_message_id"]:
-        await telegram.clear_keyboard(approval["telegram_message_id"], "\U0001f504 Redrafted.")
+        await telegram.resolve_card(
+            approval["telegram_message_id"], lead, approval, "\U0001f504 Redrafted —"
+        )
 
     new_id = db.create_approval(igsid, approval["incoming_text"], drafts.model_dump())
-    message_id = await telegram.send_approval(db.get_lead(igsid), db.get_approval(new_id))
-    db.set_approval_message_id(new_id, message_id)
+    await _post_card(new_id, igsid, telegram)
+
+
+async def stage_edit(approval_id: str, text: str, telegram: TelegramClient) -> None:
+    """Hold typed replacement text for confirmation instead of sending it.
+
+    Without this step, tapping Edit and then typing anything at all in the bot
+    chat fires it straight at a real prospect — including a stray note typed
+    hours later, after you'd forgotten a card was open. Nothing else in this
+    product reaches Instagram without an explicit tap; this closes the one gap
+    where it did.
+    """
+    approval = db.get_approval(approval_id)
+    if not approval:
+        raise RuntimeError(f"no such approval: {approval_id}")
+    db.set_approval_state(approval_id, "awaiting_confirm", sent_text=text)
+    await telegram.ask_to_confirm(db.get_lead(approval["igsid"]), approval_id, text)
+
+
+async def cancel_edit(approval_id: str, telegram: TelegramClient) -> None:
+    """Put a card back to open, so an abandoned edit can't swallow later typing."""
+    approval = db.get_approval(approval_id)
+    if not approval:
+        raise RuntimeError(f"no such approval: {approval_id}")
+    db.set_approval_state(approval_id, "open")
+    await telegram.send("Edit cancelled — the card is still open.")
