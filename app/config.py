@@ -42,7 +42,7 @@ class Config:
     ANTHROPIC_EFFORT = os.environ.get("ANTHROPIC_EFFORT", "medium")
     # Set this to whichever Flash model you actually want — an unknown id is a
     # 404 at draft time, not at startup.
-    GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+    GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.7-flash")
 
     # --- Storage -----------------------------------------------------------
     DB_PATH = os.environ.get("DB_PATH", "podcast_cover_dms.sqlite3")

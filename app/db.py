@@ -16,21 +16,26 @@ from app.config import config
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS leads (
-    igsid           TEXT PRIMARY KEY,
-    handle          TEXT,
-    podcast_name    TEXT,
-    bio             TEXT,
-    about           TEXT,
-    audience_size   TEXT,
-    voice_notes     TEXT,
-    status          TEXT NOT NULL DEFAULT 'first_contact',
-    needs           TEXT NOT NULL DEFAULT 'nothing stated yet',
-    offered         TEXT NOT NULL DEFAULT 'nothing yet',
-    price           TEXT NOT NULL DEFAULT 'not discussed',
-    commitments     TEXT NOT NULL DEFAULT 'none',
-    enriched_at     REAL,
-    created_at      REAL NOT NULL,
-    updated_at      REAL NOT NULL
+    igsid                   TEXT PRIMARY KEY,
+    handle                  TEXT,
+    podcast_name            TEXT,
+    bio                     TEXT,
+    about                   TEXT,
+    audience_size           TEXT,
+    voice_notes             TEXT,
+    status                  TEXT NOT NULL DEFAULT 'first_contact',
+    needs                   TEXT NOT NULL DEFAULT 'nothing stated yet',
+    offered                 TEXT NOT NULL DEFAULT 'nothing yet',
+    price                   TEXT NOT NULL DEFAULT 'not discussed',
+    commitments             TEXT NOT NULL DEFAULT 'none',
+    conversion_probability  INTEGER NOT NULL DEFAULT 50,
+    conversion_rationale    TEXT NOT NULL DEFAULT '',
+    buying_signals          TEXT NOT NULL DEFAULT '[]',
+    recommended_action      TEXT NOT NULL DEFAULT '',
+    notes                   TEXT NOT NULL DEFAULT '',
+    enriched_at             REAL,
+    created_at              REAL NOT NULL,
+    updated_at              REAL NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -62,6 +67,8 @@ CREATE INDEX IF NOT EXISTS approvals_open ON approvals (state, created_at);
 LEAD_FIELDS = (
     "handle", "podcast_name", "bio", "about", "audience_size", "voice_notes",
     "status", "needs", "offered", "price", "commitments",
+    "conversion_probability", "conversion_rationale", "buying_signals",
+    "recommended_action", "notes",
 )
 
 
@@ -76,6 +83,18 @@ def connect() -> sqlite3.Connection:
 def init() -> None:
     with connect() as conn:
         conn.executescript(SCHEMA)
+        # Additive column migrations for existing databases
+        for col, col_type, default_val in [
+            ("conversion_probability", "INTEGER", "50"),
+            ("conversion_rationale", "TEXT", "''"),
+            ("buying_signals", "TEXT", "'[]'"),
+            ("recommended_action", "TEXT", "''"),
+            ("notes", "TEXT", "''"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE leads ADD COLUMN {col} {col_type} NOT NULL DEFAULT {default_val}")
+            except sqlite3.OperationalError:
+                pass  # column already exists
 
 
 # --- leads -----------------------------------------------------------------
@@ -217,3 +236,110 @@ def open_approval_for(igsid: str) -> dict[str, Any] | None:
             (igsid,),
         ).fetchone()
     return get_approval(row["id"]) if row else None
+
+
+# --- CRM & Dashboard Helpers -----------------------------------------------
+
+def list_leads() -> list[dict[str, Any]]:
+    """Return all leads sorted by most recent activity with latest message preview."""
+    with connect() as conn:
+        leads_rows = conn.execute(
+            "SELECT * FROM leads ORDER BY updated_at DESC, created_at DESC"
+        ).fetchall()
+        result = []
+        for row in leads_rows:
+            lead = dict(row)
+            try:
+                lead["buying_signals"] = json.loads(lead.get("buying_signals") or "[]")
+            except Exception:
+                lead["buying_signals"] = []
+            
+            # Fetch latest message
+            last_msg = conn.execute(
+                "SELECT direction, text, created_at FROM messages WHERE igsid = ?"
+                " ORDER BY created_at DESC LIMIT 1",
+                (lead["igsid"],),
+            ).fetchone()
+            lead["last_message"] = dict(last_msg) if last_msg else None
+
+            # Fetch total message count
+            count_row = conn.execute(
+                "SELECT COUNT(*) AS total FROM messages WHERE igsid = ?",
+                (lead["igsid"],),
+            ).fetchone()
+            lead["message_count"] = int(count_row["total"]) if count_row else 0
+
+            # Fetch open approval if any
+            open_app = open_approval_for(lead["igsid"])
+            lead["has_open_approval"] = bool(open_app)
+            lead["latest_drafts"] = open_app.get("drafts") if open_app else None
+            result.append(lead)
+    return result
+
+
+def get_lead_messages(igsid: str) -> list[dict[str, Any]]:
+    """Return all messages for a lead sorted chronologically."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT id, igsid, direction, text, mid, created_at FROM messages"
+            " WHERE igsid = ? ORDER BY created_at ASC",
+            (igsid,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def delete_lead(igsid: str) -> bool:
+    """Delete a lead and all associated messages and approvals."""
+    with connect() as conn:
+        conn.execute("DELETE FROM approvals WHERE igsid = ?", (igsid,))
+        conn.execute("DELETE FROM messages WHERE igsid = ?", (igsid,))
+        cursor = conn.execute("DELETE FROM leads WHERE igsid = ?", (igsid,))
+    return cursor.rowcount > 0
+
+
+def get_export_rows() -> list[dict[str, Any]]:
+    """Return comprehensive flat records for CSV / Google Sheets export."""
+    with connect() as conn:
+        leads = conn.execute("SELECT * FROM leads ORDER BY updated_at DESC").fetchall()
+        rows = []
+        for l in leads:
+            lead = dict(l)
+            igsid = lead["igsid"]
+            
+            # Message stats & thread
+            msgs = conn.execute(
+                "SELECT direction, text, created_at FROM messages WHERE igsid = ? ORDER BY created_at ASC",
+                (igsid,),
+            ).fetchall()
+            
+            thread_text = " | ".join(f"[{m['direction'].upper()}]: {m['text']}" for m in msgs)
+            
+            try:
+                buying_signals_str = ", ".join(json.loads(lead.get("buying_signals") or "[]"))
+            except Exception:
+                buying_signals_str = str(lead.get("buying_signals") or "")
+
+            created_time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(lead["created_at"]))
+            updated_time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(lead["updated_at"]))
+
+            rows.append({
+                "Instagram ID / Handle": lead.get("handle") or igsid,
+                "Podcast Name": lead.get("podcast_name") or "",
+                "Bio / Niche": lead.get("bio") or "",
+                "Audience Size": lead.get("audience_size") or "",
+                "Status / Stage": lead.get("status") or "first_contact",
+                "Conversion Probability (%)": lead.get("conversion_probability", 50),
+                "Conversion Analysis": lead.get("conversion_rationale") or "",
+                "Buying Signals": buying_signals_str,
+                "Recommended Action": lead.get("recommended_action") or "",
+                "Stated Needs": lead.get("needs") or "",
+                "Offered Service": lead.get("offered") or "",
+                "Quoted Price": lead.get("price") or "",
+                "Commitments": lead.get("commitments") or "",
+                "Notes": lead.get("notes") or "",
+                "Total Messages": len(msgs),
+                "Full Chat History": thread_text,
+                "First Contact Date": created_time_str,
+                "Last Active Date": updated_time_str,
+            })
+    return rows

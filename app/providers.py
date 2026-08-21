@@ -55,14 +55,32 @@ class GeminiProvider:
     async def complete(self, prompt: str) -> DraftSet:
         from google.genai import types
 
-        response = await self._client.aio.models.generate_content(
-            model=config.GEMINI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=DraftSet,
-            ),
-        )
+        candidate_models = [config.GEMINI_MODEL]
+        for fallback in ("gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"):
+            if fallback not in candidate_models:
+                candidate_models.append(fallback)
+
+        last_err: Exception | None = None
+        for model_name in candidate_models:
+            try:
+                response = await self._client.aio.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=DraftSet,
+                    ),
+                )
+                break
+            except Exception as exc:
+                last_err = exc
+                err_str = str(exc).lower()
+                if "503" in err_str or "unavailable" in err_str or "high demand" in err_str:
+                    log.warning("Model %s hit temporary 503/high demand, trying fallback...", model_name)
+                    continue
+                raise
+        else:
+            raise last_err or RuntimeError("All Gemini models failed")
 
         # A blocked prompt comes back as a normal response with no candidates,
         # so this has to be checked before reading anything off it.
