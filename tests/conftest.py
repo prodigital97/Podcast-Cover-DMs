@@ -13,6 +13,8 @@ os.environ.setdefault("TELEGRAM_BOT_TOKEN", "tg-token")
 os.environ.setdefault("TELEGRAM_CHAT_ID", "4242")
 os.environ.setdefault("TELEGRAM_WEBHOOK_SECRET", "tg-secret")
 os.environ.setdefault("ANTHROPIC_API_KEY", "not-used-in-tests")
+os.environ.setdefault("DASHBOARD_USERNAME", "test-admin")
+os.environ.setdefault("DASHBOARD_PASSWORD", "test-password")
 
 import pytest  # noqa: E402
 

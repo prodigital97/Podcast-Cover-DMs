@@ -9,13 +9,15 @@ import hmac
 import io
 import logging
 import pathlib
+import secrets
 import time
 from typing import Any
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from app import approvals, db
 from app.config import config
@@ -210,6 +212,11 @@ async def _process_message(message: dict) -> None:
 
 
 # --- Dashboard & CRM REST API ----------------------------------------------
+#
+# Everything below reads, exports, or deletes lead data, so every route in
+# this section sits behind HTTP Basic Auth. The webhook routes above stay
+# open — they authenticate a different way (HMAC signature / shared secret)
+# that a browser login can't replicate.
 
 from fastapi.staticfiles import StaticFiles
 
@@ -217,9 +224,21 @@ STATIC_DIR = pathlib.Path(__file__).resolve().parent / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+_basic_auth = HTTPBasic()
 
-@app.get("/")
-@app.get("/dashboard")
+
+def require_auth(credentials: HTTPBasicCredentials = Depends(_basic_auth)) -> None:
+    valid_user = secrets.compare_digest(credentials.username, config.dashboard_username())
+    valid_pass = secrets.compare_digest(credentials.password, config.dashboard_password())
+    if not (valid_user and valid_pass):
+        raise HTTPException(
+            status_code=401, detail="Invalid credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
+
+@app.get("/", dependencies=[Depends(require_auth)])
+@app.get("/dashboard", dependencies=[Depends(require_auth)])
 async def dashboard() -> Response:
     index_file = STATIC_DIR / "index.html"
     if index_file.exists():
@@ -227,13 +246,13 @@ async def dashboard() -> Response:
     return Response("Dashboard UI loading... static files not yet initialized.", media_type="text/plain")
 
 
-@app.get("/api/leads")
+@app.get("/api/leads", dependencies=[Depends(require_auth)])
 async def api_list_leads() -> dict[str, Any]:
     leads = db.list_leads()
     return {"leads": leads, "count": len(leads)}
 
 
-@app.post("/api/leads")
+@app.post("/api/leads", dependencies=[Depends(require_auth)])
 async def api_create_lead(payload: dict[str, Any]) -> dict[str, Any]:
     handle = (payload.get("handle") or "").strip()
     igsid = payload.get("igsid") or (f"lead_{handle.lstrip('@')}" if handle else f"lead_{uuid.uuid4().hex[:8]}")
@@ -262,7 +281,7 @@ async def api_create_lead(payload: dict[str, Any]) -> dict[str, Any]:
     return {"success": True, "igsid": igsid, "lead": lead, "drafts": drafts}
 
 
-@app.get("/api/leads/{igsid}")
+@app.get("/api/leads/{igsid}", dependencies=[Depends(require_auth)])
 async def api_get_lead(igsid: str) -> dict[str, Any]:
     lead = db.get_lead(igsid)
     if not lead:
@@ -272,7 +291,7 @@ async def api_get_lead(igsid: str) -> dict[str, Any]:
     return {"lead": lead, "messages": messages, "open_approval": open_approval}
 
 
-@app.put("/api/leads/{igsid}")
+@app.put("/api/leads/{igsid}", dependencies=[Depends(require_auth)])
 async def api_update_lead(igsid: str, payload: dict[str, Any]) -> dict[str, Any]:
     lead = db.get_lead(igsid)
     if not lead:
@@ -281,13 +300,13 @@ async def api_update_lead(igsid: str, payload: dict[str, Any]) -> dict[str, Any]
     return {"success": True, "lead": updated}
 
 
-@app.delete("/api/leads/{igsid}")
+@app.delete("/api/leads/{igsid}", dependencies=[Depends(require_auth)])
 async def api_delete_lead(igsid: str) -> dict[str, Any]:
     deleted = db.delete_lead(igsid)
     return {"success": deleted}
 
 
-@app.post("/api/leads/{igsid}/messages")
+@app.post("/api/leads/{igsid}/messages", dependencies=[Depends(require_auth)])
 async def api_add_message(igsid: str, payload: dict[str, Any]) -> dict[str, Any]:
     text = (payload.get("text") or "").strip()
     if not text:
@@ -320,7 +339,7 @@ async def api_add_message(igsid: str, payload: dict[str, Any]) -> dict[str, Any]
     return {"success": True, "lead": lead, "messages": messages, "drafts": drafts}
 
 
-@app.post("/api/leads/{igsid}/redraft")
+@app.post("/api/leads/{igsid}/redraft", dependencies=[Depends(require_auth)])
 async def api_redraft(igsid: str) -> dict[str, Any]:
     lead = db.get_lead(igsid)
     if not lead:
@@ -341,7 +360,7 @@ async def api_redraft(igsid: str) -> dict[str, Any]:
     return {"success": True, "drafts": drafts, "lead": db.get_lead(igsid)}
 
 
-@app.post("/api/leads/{igsid}/approve")
+@app.post("/api/leads/{igsid}/approve", dependencies=[Depends(require_auth)])
 async def api_approve_draft(igsid: str, payload: dict[str, Any]) -> dict[str, Any]:
     text = (payload.get("text") or "").strip()
     approval_id = payload.get("approval_id")
@@ -357,7 +376,7 @@ async def api_approve_draft(igsid: str, payload: dict[str, Any]) -> dict[str, An
     return {"success": True, "lead": lead, "messages": messages}
 
 
-@app.get("/api/export/csv")
+@app.get("/api/export/csv", dependencies=[Depends(require_auth)])
 async def api_export_csv() -> Response:
     rows = db.get_export_rows()
     if not rows:

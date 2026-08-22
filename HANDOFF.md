@@ -29,7 +29,15 @@ questions it doesn't answer.
 - **Swappable model backend** — `app/providers.py`. `LLM_PROVIDER=anthropic`
   or `gemini` in the env file; both use native structured outputs so a bad
   reply fails the call rather than reaching the approval card.
-- **48 tests, all passing, no credentials needed**: `python3 -m pytest tests -q`
+- **Dashboard auth** — the dashboard page and all nine `/api/*` routes
+  (lead read/write/delete, CSV export) were open to anyone who found the
+  URL; they're now behind HTTP Basic Auth (`app/main.py`'s `require_auth`,
+  checked with `secrets.compare_digest`). Webhook routes are untouched —
+  they authenticate their own way (HMAC signature / Telegram shared secret)
+  and a browser login can't replicate that. Needs `DASHBOARD_USERNAME` /
+  `DASHBOARD_PASSWORD` set in the env file — see pending item below, this
+  is not yet set on the live server.
+- **63 tests, all passing, no credentials needed**: `python3 -m pytest tests -q`
 - **Deploy tooling** — `deploy/setup.sh` (one-shot Ubuntu setup: Python, Caddy
   for automatic HTTPS, systemd service, nightly SQLite backup) and
   `deploy/gcloud-create-vm.sh` (creates the free-tier GCP VM in one command).
@@ -124,6 +132,19 @@ reasoning is worth knowing if something adjacent breaks:
 ---
 
 ## Pending — in the order I'd do them
+
+### 0. Set the dashboard password before this deploy goes out (urgent, ~1 minute)
+`DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD` are new in `.env.example` but
+**not yet set on the live server** — the app will refuse to serve the
+dashboard/`/api/*` routes (500) until they're filled in. On the server:
+
+```
+sudo nano /etc/podcast-cover-dms/env   # fill in DASHBOARD_USERNAME and DASHBOARD_PASSWORD
+sudo git pull
+sudo systemctl restart podcast-cover-dms
+curl -u <user>:<pass> https://34.56.254.33.sslip.io/api/leads   # should be 200
+curl https://34.56.254.33.sslip.io/api/leads                    # should be 401
+```
 
 ### 1. Confirm the Telegram token rotation (urgent, ~2 minutes)
 See the ⚠️ above. Don't skip this — a leaked bot token is a real compromise

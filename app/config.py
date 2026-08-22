@@ -77,5 +77,14 @@ class Config:
         """Shared secret Telegram echoes in X-Telegram-Bot-Api-Secret-Token."""
         return _req("TELEGRAM_WEBHOOK_SECRET")
 
+    @staticmethod
+    def dashboard_username() -> str:
+        """HTTP Basic Auth guarding the dashboard UI and every /api/* route."""
+        return _req("DASHBOARD_USERNAME")
+
+    @staticmethod
+    def dashboard_password() -> str:
+        return _req("DASHBOARD_PASSWORD")
+
 
 config = Config()

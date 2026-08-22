@@ -13,7 +13,14 @@ def client(monkeypatch):
 
     monkeypatch.setattr(main, "draft", fake_draft)
     with TestClient(main.app) as test_client:
+        test_client.auth = ("test-admin", "test-password")
         yield test_client
+
+
+def test_api_requires_auth():
+    with TestClient(main.app) as anon_client:
+        assert anon_client.get("/api/leads").status_code == 401
+        assert anon_client.get("/dashboard").status_code == 401
 
 
 def test_lead_crud_and_message_flow(client):
